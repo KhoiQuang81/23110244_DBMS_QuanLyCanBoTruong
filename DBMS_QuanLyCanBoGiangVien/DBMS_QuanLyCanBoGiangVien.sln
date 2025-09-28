@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35913.81
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBMS_QuanLyCanBoGiangVien", "DBMS_QuanLyCanBoGiangVien\DBMS_QuanLyCanBoGiangVien.csproj", "{5C4E45F4-08A6-4229-AFE1-56B6AD763998}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataLayer", "DataLayer\DataLayer.csproj", "{F2BD4B74-8986-4D1E-84D1-178E303429B8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5C4E45F4-08A6-4229-AFE1-56B6AD763998}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C4E45F4-08A6-4229-AFE1-56B6AD763998}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C4E45F4-08A6-4229-AFE1-56B6AD763998}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C4E45F4-08A6-4229-AFE1-56B6AD763998}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2BD4B74-8986-4D1E-84D1-178E303429B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2BD4B74-8986-4D1E-84D1-178E303429B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2BD4B74-8986-4D1E-84D1-178E303429B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2BD4B74-8986-4D1E-84D1-178E303429B8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BBD7540C-6691-4359-89A2-01416D43E684}
+	EndGlobalSection
+EndGlobal
