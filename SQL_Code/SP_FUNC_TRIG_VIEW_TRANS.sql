@@ -660,7 +660,8 @@ CREATE OR ALTER PROCEDURE HasP_InsertPhanCong
     @SoTiet INT,
     @SoTuan INT,
     @HocKy INT,
-    @NamHoc NVARCHAR(9)
+    @NamHoc NVARCHAR(9),
+    @MaNganh NVARCHAR(20)   -- thêm ngành
 AS
 BEGIN
     IF EXISTS (SELECT 1 FROM PhanCongGiangDay
@@ -672,8 +673,8 @@ BEGIN
 
     DECLARE @TenMon NVARCHAR(200) = (SELECT TenMon FROM MonHoc WHERE MaMon=@MaMon);
 
-    INSERT INTO PhanCongGiangDay(MaCB, MaMon, TenMon, MaLopHocPhan, SoTiet, SoTuan, HocKy, NamHoc)
-    VALUES(@MaCB, @MaMon, @TenMon, @MaLopHocPhan, @SoTiet, @SoTuan, @HocKy, @NamHoc);
+    INSERT INTO PhanCongGiangDay(MaCB, MaMon, TenMon, MaLopHocPhan, SoTiet, SoTuan, HocKy, NamHoc, MaNganh)
+    VALUES(@MaCB, @MaMon, @TenMon, @MaLopHocPhan, @SoTiet, @SoTuan, @HocKy, @NamHoc, @MaNganh);
 END;
 GO
 
@@ -690,7 +691,8 @@ CREATE OR ALTER PROCEDURE HasP_UpdatePhanCong
     @New_SoTiet INT,
     @New_SoTuan INT,
     @New_HocKy INT,
-    @New_NamHoc NVARCHAR(9)
+    @New_NamHoc NVARCHAR(9),
+    @New_MaNganh NVARCHAR(20)   -- thêm ngành
 AS
 BEGIN
     IF EXISTS (SELECT 1 FROM PhanCongGiangDay
@@ -710,11 +712,13 @@ BEGIN
         SoTiet=@New_SoTiet,
         SoTuan=@New_SoTuan,
         HocKy=@New_HocKy,
-        NamHoc=@New_NamHoc
+        NamHoc=@New_NamHoc,
+        MaNganh=@New_MaNganh
     WHERE MaCB=@Old_MaCB AND MaMon=@Old_MaMon AND MaLopHocPhan=@Old_MaLopHocPhan
           AND HocKy=@Old_HocKy AND NamHoc=@Old_NamHoc;
 END;
 GO
+
 
 -- Xóa phân công
 CREATE OR ALTER PROCEDURE HasP_DeletePhanCong
@@ -740,6 +744,7 @@ BEGIN
 
     SELECT 
         pc.MaCB,
+        pc.MaMon,          -- thêm cột này để form dùng
         pc.TenMon,
         pc.MaLopHocPhan,
         pc.SoTiet,
@@ -751,7 +756,6 @@ BEGIN
     WHERE cb.MaKhoa = @MaKhoa
     ORDER BY pc.NamHoc DESC, pc.HocKy, pc.TenMon;
 END;
-GO
 
 /*=========================
 		3. FUNCTION

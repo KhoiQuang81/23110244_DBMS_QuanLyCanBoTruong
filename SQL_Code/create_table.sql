@@ -199,6 +199,20 @@ CREATE TABLE PhanCongGiangDay (
 );
 Go
 
+ALTER TABLE PhanCongGiangDay
+ADD MaNganh NVARCHAR(20) NOT NULL;
+GO
+
+ALTER TABLE PhanCongGiangDay
+ADD CONSTRAINT FK_PhanCong_Nganh FOREIGN KEY (MaNganh)
+    REFERENCES Nganh(MaNganh)
+    ON UPDATE CASCADE
+    ON DELETE NO ACTION;
+GO
+
+EXEC sp_help 'PhanCongGiangDay';
+
+
 
 -------------------------------------------------------------
 -- 8. HeSoLuong, BangLuong (lương hàng tháng)

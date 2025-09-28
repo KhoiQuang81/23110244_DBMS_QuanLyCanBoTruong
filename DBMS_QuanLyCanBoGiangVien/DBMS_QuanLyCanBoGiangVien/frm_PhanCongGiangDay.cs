@@ -22,6 +22,7 @@ namespace DBMS_QuanLyCanBoGiangVien
         private string _maCB;
         private string _maMon;
         private string _maLop;
+        private string _maNganh;
 
         public frm_PhanCongGiangDay(string connStr)
         {
@@ -91,7 +92,8 @@ namespace DBMS_QuanLyCanBoGiangVien
             new SqlParameter("@SoTiet", int.Parse(txt_SoTiet.Text)),
             new SqlParameter("@SoTuan", int.Parse(txt_SoTuan.Text)),
             new SqlParameter("@HocKy", Convert.ToInt32(cb_HocKy.SelectedItem)),
-            new SqlParameter("@NamHoc", txt_NamHoc.Text.Trim()));
+            new SqlParameter("@NamHoc", txt_NamHoc.Text.Trim()),
+            new SqlParameter("@MaNganh", _maNganh));
 
             LoadPhanCong();
             LoadLopHPChuaPC();
@@ -115,7 +117,8 @@ namespace DBMS_QuanLyCanBoGiangVien
                 new SqlParameter("@New_SoTiet", int.Parse(txt_SoTiet.Text)),
                 new SqlParameter("@New_SoTuan", int.Parse(txt_SoTuan.Text)),
                 new SqlParameter("@New_HocKy", Convert.ToInt32(cb_HocKy.SelectedItem)),
-                new SqlParameter("@New_NamHoc", txt_NamHoc.Text.Trim()));
+                new SqlParameter("@New_NamHoc", txt_NamHoc.Text.Trim()),
+                new SqlParameter("@New_MaNganh", _maNganh));
 
             LoadPhanCong();
             LoadLopHPChuaPC();
@@ -270,8 +273,10 @@ namespace DBMS_QuanLyCanBoGiangVien
         private void cb_TenNganh_SelectionChangeCommitted(object sender, EventArgs e)
         {
             if (cb_TenNganh.SelectedValue == null) return;
+            _maNganh = cb_TenNganh.SelectedValue.ToString();
+
             var dtMon = db.ExecuteQuery("HasP_GetMonHocByNganh_PC",
-                new SqlParameter("@MaNganh", cb_TenNganh.SelectedValue.ToString()));
+                new SqlParameter("@MaNganh", _maNganh));
             cb_MonHoc.DataSource = dtMon;
             cb_MonHoc.DisplayMember = "TenMon";
             cb_MonHoc.ValueMember = "MaMon";
