@@ -661,14 +661,15 @@ CREATE OR ALTER PROCEDURE HasP_InsertPhanCong
     @SoTuan INT,
     @HocKy INT,
     @NamHoc NVARCHAR(9),
-    @MaNganh NVARCHAR(20)   -- thêm ngành
+    @MaNganh NVARCHAR(20)   -- thêm tham số ngành
 AS
 BEGIN
     IF EXISTS (SELECT 1 FROM PhanCongGiangDay
                WHERE MaLopHocPhan=@MaLopHocPhan
                  AND HocKy=@HocKy AND NamHoc=@NamHoc)
     BEGIN
-        RAISERROR(N'Lớp học phần đã được phân công kỳ/năm này',16,1); RETURN;
+        RAISERROR(N'Lớp học phần đã được phân công kỳ/năm này',16,1); 
+        RETURN;
     END;
 
     DECLARE @TenMon NVARCHAR(200) = (SELECT TenMon FROM MonHoc WHERE MaMon=@MaMon);
@@ -677,6 +678,7 @@ BEGIN
     VALUES(@MaCB, @MaMon, @TenMon, @MaLopHocPhan, @SoTiet, @SoTuan, @HocKy, @NamHoc, @MaNganh);
 END;
 GO
+
 
 -- Update phân công
 CREATE OR ALTER PROCEDURE HasP_UpdatePhanCong
@@ -756,6 +758,56 @@ BEGIN
     WHERE cb.MaKhoa = @MaKhoa
     ORDER BY pc.NamHoc DESC, pc.HocKy, pc.TenMon;
 END;
+go
+
+
+
+-------------------------------------------------------------
+-------------------------------------------------------------
+-----------------------LƯƠNG---------------------------------
+-------------------------------------------------------------
+-------------------------------------------------------------
+-- SP + TRANSACTION
+-- Tính lương theo tiết
+CREATE OR ALTER PROCEDURE Re_TinhLuongGiangVien
+    @MaCB NVARCHAR(20),
+    @ThangNam CHAR(7),
+    @DonGiaTiet DECIMAL(18,2),  -- ví dụ: 200,000 / tiết
+    @HeSoId INT = NULL,
+    @PhuCap DECIMAL(18,2) = 0,
+    @KhauTru DECIMAL(18,2) = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        BEGIN TRAN;
+
+        -- Lấy tổng số tiết giảng dạy trong kỳ này
+        DECLARE @SoTiet INT = (
+            SELECT SUM(SoTiet * SoTuan)
+            FROM PhanCongGiangDay
+            WHERE MaCB=@MaCB AND FORMAT(GETDATE(),'yyyy') + '-' + FORMAT(GETDATE(),'MM') = @ThangNam
+        );
+
+        IF @SoTiet IS NULL SET @SoTiet = 0;
+
+        DECLARE @LuongCoBan DECIMAL(18,2) = @SoTiet * @DonGiaTiet;
+
+        -- Thêm bản ghi bảng lương
+        INSERT INTO BangLuong(MaCB, ThangNam, LuongCoBan, HeSoId, TongPhuCap, KhauTru)
+        VALUES(@MaCB, @ThangNam, @LuongCoBan, @HeSoId, @PhuCap, @KhauTru);
+
+        COMMIT TRAN;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRAN;
+        THROW;
+    END CATCH
+END;
+
+
+
+
 
 /*=========================
 		3. FUNCTION

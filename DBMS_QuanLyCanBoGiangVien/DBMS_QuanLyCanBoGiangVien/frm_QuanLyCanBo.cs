@@ -67,19 +67,13 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void btn_QLLuong_Click(object sender, EventArgs e)
         {
-            frm_QuanLyLuong frm = new frm_QuanLyLuong();
+            frm_QuanLyLuong frm = new frm_QuanLyLuong(connStr);
             frm.ShowDialog();
         }
 
         private void btn_DangXuat_Click(object sender, EventArgs e)
         {
 
-        }
-
-        private void btn_QLDiem_Click(object sender, EventArgs e)
-        {
-            frm_QuanLyDiemSV frm = new frm_QuanLyDiemSV();
-            frm.ShowDialog();
         }
 
         private void btn_HoSoCaNhan_Click(object sender, EventArgs e)

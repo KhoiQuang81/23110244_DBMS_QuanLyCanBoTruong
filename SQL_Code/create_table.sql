@@ -56,6 +56,10 @@ CREATE TABLE Nganh (
   CONSTRAINT FK_Nganh_Khoa FOREIGN KEY (MaKhoa) REFERENCES Khoa(MaKhoa) ON DELETE NO ACTION ON UPDATE CASCADE
 );
 
+Alter TABLE Nganh 
+  add CONSTRAINT FK_Nganh_Khoa FOREIGN KEY (MaKhoa) REFERENCES Khoa(MaKhoa) ON DELETE NO ACTION ON UPDATE CASCADE
+;
+
 CREATE TABLE ChuongTrinh (
   MaCT NVARCHAR(20) NOT NULL PRIMARY KEY,
   TenCT NVARCHAR(200) NOT NULL,
@@ -103,6 +107,10 @@ CREATE TABLE CanBo (
 );
 GO
 
+ALTER TABLE CanBo
+ADD MaBacLuong NVARCHAR(20) FOREIGN KEY REFERENCES BacLuong(MaBacLuong),
+    PhuCap DECIMAL(18,2) DEFAULT 0;
+
 -- Đảm bảo 1 trưởng khoa duy nhất: unique filtered index trên (MaKhoa) khi MaChucVu = 'TK';
 CREATE UNIQUE INDEX UX_CanBo_OneHeadPerKhoa ON CanBo(MaKhoa)
 WHERE MaChucVu = 'TK';
@@ -133,7 +141,7 @@ CREATE TABLE ChuongTrinh_MonHoc (
 );
 
 -------------------------------------------------------------
--- 6. Lop (lớp học phần) và SinhVien, SinhVien_Lop (bảng trung gian)
+-- 6. Lop 
 -------------------------------------------------------------
 CREATE TABLE LopHocPhan (
   MaLopHocPhan NVARCHAR(20) NOT NULL PRIMARY KEY,
@@ -147,35 +155,6 @@ CREATE TABLE LopHocPhan (
   CONSTRAINT FK_Lop_MaNganh FOREIGN KEY (MaNganh) REFERENCES Nganh(MaNganh) ON DELETE SET NULL,
   CONSTRAINT FK_Lop_MaCT FOREIGN KEY (MaCT) REFERENCES ChuongTrinh(MaCT) ON DELETE SET NULL,
   CONSTRAINT FK_LopHocPhan_MonHoc FOREIGN KEY (MaMon) REFERENCES MonHoc(MaMon)
-);
-GO
-
-CREATE TABLE SinhVien (
-  HoTen NVARCHAR(150) NOT NULL,
-  NgaySinh DATE NULL,
-  GioiTinh CHAR(1) NULL CHECK (GioiTinh IN ('M','F','O')),
-  MaKhoa NVARCHAR(20) NULL,
-  MaNganh NVARCHAR(20) NULL,
-  MaCT NVARCHAR(20) NULL,
-  MaLop NVARCHAR(20) NOT NULL
-  CONSTRAINT FK_SV_MaKhoa FOREIGN KEY (MaKhoa) REFERENCES Khoa(MaKhoa) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT FK_SV_MaNganh FOREIGN KEY (MaNganh) REFERENCES Nganh(MaNganh) ON DELETE SET NULL,
-  CONSTRAINT FK_SV_MaCT FOREIGN KEY (MaCT) REFERENCES ChuongTrinh(MaCT) ON DELETE SET NULL
-);
-GO
-
--- Bảng trung gian SinhVien_Lop (một SV có thể học nhiều lớp; một lớp có nhiều SV)
-CREATE TABLE SinhVien_Lop (
-  MaSV NVARCHAR(20) NOT NULL,
-  MaLopHocPhan NVARCHAR(20) NOT NULL,
-  DiemQuaTrinh DECIMAL(5,2) NULL, --- Do GV được phân công nhập
-  DiemCuoiKy DECIMAL(5,2) NULL,
-  DiemTrungBinh DECIMAL(5,2) NULL,
-  TrangThai NVARCHAR(20),
-  CONSTRAINT FK_SVL_SV FOREIGN KEY (MaSV) REFERENCES SinhVien(MaSV) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT FK_SVL_Lop FOREIGN KEY (MaLopHocPhan) REFERENCES LopHocPhan(MaLopHocPhan) ON DELETE CASCADE,
-  CONSTRAINT UQ_SVL UNIQUE (MaSV, MaLopHocPhan),
-  CONSTRAINT PK_SVLHP PRIMARY KEY (MaSV, MaLopHocPhan)
 );
 GO
 
@@ -204,38 +183,33 @@ ADD MaNganh NVARCHAR(20) NOT NULL;
 GO
 
 ALTER TABLE PhanCongGiangDay
+ALTER COLUMN MaNganh NVARCHAR(20) NOT NULL;
+
+ALTER TABLE PhanCongGiangDay
 ADD CONSTRAINT FK_PhanCong_Nganh FOREIGN KEY (MaNganh)
-    REFERENCES Nganh(MaNganh)
-    ON UPDATE CASCADE
-    ON DELETE NO ACTION;
-GO
-
-EXEC sp_help 'PhanCongGiangDay';
-
-
+    REFERENCES Nganh(MaNganh);
 
 -------------------------------------------------------------
 -- 8. HeSoLuong, BangLuong (lương hàng tháng)
 -------------------------------------------------------------
-CREATE TABLE HeSoLuong (
-  HeSoId INT IDENTITY PRIMARY KEY,
-  TenHeSo NVARCHAR(100) NOT NULL,
-  GiaTri DECIMAL(5,2) NOT NULL CHECK (GiaTri >= 0)
+
+CREATE TABLE BacLuong (
+    MaBacLuong NVARCHAR(20) PRIMARY KEY,
+    HeSoLuong DECIMAL(4,2)
 );
-GO
 
 CREATE TABLE BangLuong (
-  BangLuongId INT IDENTITY PRIMARY KEY,
-  MaCB NVARCHAR(20) NOT NULL,
-  ThangNam CHAR(7) NOT NULL, -- 'YYYY-MM'
-  LuongCoBan DECIMAL(18,2) NOT NULL CHECK (LuongCoBan >= 0),
-  HeSoId INT NULL,
-  TongPhuCap DECIMAL(18,2) DEFAULT 0,
-  KhauTru DECIMAL(18,2) DEFAULT 0,
-  TongLuong DECIMAL(18,2) NULL,
-  CONSTRAINT FK_BangLuong_MaCB FOREIGN KEY (MaCB) REFERENCES CanBo(MaCB) ON DELETE NO ACTION ON UPDATE CASCADE,
-  CONSTRAINT FK_BangLuong_HeSo FOREIGN KEY (HeSoId) REFERENCES HeSoLuong(HeSoId) ON DELETE NO ACTION ON UPDATE CASCADE,
-  CONSTRAINT UQ_BangLuong UNIQUE (MaCB, ThangNam)
+    MaBangLuong INT IDENTITY PRIMARY KEY,
+    MaCB NVARCHAR(20) NOT NULL,
+    Thang INT,
+    Nam INT,
+    Thuong DECIMAL(18,2) DEFAULT 0,
+    KhauTru DECIMAL(18,2) DEFAULT 0,
+	CONSTRAINT FK_BangLuong_CanBo FOREIGN KEY (MaCB) REFERENCES CanBo(MaCB) ON DELETE CASCADE
 );
-GO
+
+CREATE TABLE CauHinhLuong (
+    MucLuongCoSo DECIMAL(18,2)
+);
+
 
