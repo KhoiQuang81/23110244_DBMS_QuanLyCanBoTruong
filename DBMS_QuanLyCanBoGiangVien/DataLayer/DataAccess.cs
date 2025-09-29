@@ -18,7 +18,7 @@ namespace DataLayer
 
         public DataAccess(string connStr)
         {
-            //connectionString = connStr;
+            connectionString = connStr;
             conn = new SqlConnection(connectionString);
             cmd = conn.CreateCommand();
         }
@@ -30,6 +30,7 @@ namespace DataLayer
                          "Encrypt=True;TrustServerCertificate=True;";
         }
 
+        // ====== Dùng cho Stored Procedure ======
         public DataTable ExecuteQuery(string spName, params SqlParameter[] parameters)
         {
             using (SqlConnection conn = new SqlConnection(connectionString))
@@ -37,6 +38,7 @@ namespace DataLayer
                 SqlCommand cmd = new SqlCommand(spName, conn);
                 cmd.CommandType = CommandType.StoredProcedure;
                 if (parameters != null) cmd.Parameters.AddRange(parameters);
+
                 SqlDataAdapter da = new SqlDataAdapter(cmd);
                 DataTable dt = new DataTable();
                 da.Fill(dt);
@@ -44,19 +46,7 @@ namespace DataLayer
             }
         }
 
-        public int ExecuteNonQuery(string spName, params SqlParameter[] parameters)
-        {
-            using (SqlConnection conn = new SqlConnection(connectionString))
-            {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand(spName, conn);
-                cmd.CommandType = CommandType.StoredProcedure;
-                if (parameters != null) cmd.Parameters.AddRange(parameters);
-                return cmd.ExecuteNonQuery();
-            }
-        }
-
-
+        // ====== Dùng cho View hoặc SELECT text ======
         public DataTable ExecuteQueryText(string query, params SqlParameter[] parameters)
         {
             using (SqlConnection conn = new SqlConnection(connectionString))
@@ -69,6 +59,34 @@ namespace DataLayer
                 DataTable dt = new DataTable();
                 da.Fill(dt);
                 return dt;
+            }
+        }
+
+        // ====== Dùng cho Insert / Update / Delete ======
+        public int ExecuteNonQuery(string spName, params SqlParameter[] parameters)
+        {
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand(spName, conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+                if (parameters != null) cmd.Parameters.AddRange(parameters);
+
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        // ====== Dùng cho Scalar (trả về 1 giá trị duy nhất) ======
+        public object ExecuteScalar(string query, params SqlParameter[] parameters)
+        {
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand(query, conn);
+                cmd.CommandType = CommandType.Text;
+                if (parameters != null) cmd.Parameters.AddRange(parameters);
+
+                return cmd.ExecuteScalar();
             }
         }
     }

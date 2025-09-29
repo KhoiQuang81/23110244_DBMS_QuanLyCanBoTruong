@@ -28,7 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             this.splitContainerControl1 = new DevExpress.XtraEditors.SplitContainerControl();
             this.label1 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
@@ -86,7 +86,7 @@
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(639, 26);
+            this.label1.Location = new System.Drawing.Point(679, 24);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(226, 33);
             this.label1.TabIndex = 0;
@@ -135,6 +135,7 @@
             this.txt_KhauTru.Name = "txt_KhauTru";
             this.txt_KhauTru.Size = new System.Drawing.Size(121, 35);
             this.txt_KhauTru.TabIndex = 14;
+            this.txt_KhauTru.TextChanged += new System.EventHandler(this.txt_KhauTru_TextChanged);
             // 
             // txt_Thuong
             // 
@@ -143,6 +144,7 @@
             this.txt_Thuong.Name = "txt_Thuong";
             this.txt_Thuong.Size = new System.Drawing.Size(121, 35);
             this.txt_Thuong.TabIndex = 13;
+            this.txt_Thuong.TextChanged += new System.EventHandler(this.txt_Thuong_TextChanged);
             // 
             // btn_LamMoi
             // 
@@ -281,8 +283,8 @@
             // 
             // dgv_BangLuong
             // 
-            dataGridViewCellStyle1.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.dgv_BangLuong.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle3.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.dgv_BangLuong.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle3;
             this.dgv_BangLuong.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgv_BangLuong.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.dgv_BangLuong.Location = new System.Drawing.Point(0, 312);
@@ -292,7 +294,6 @@
             this.dgv_BangLuong.Size = new System.Drawing.Size(1521, 405);
             this.dgv_BangLuong.TabIndex = 0;
             this.dgv_BangLuong.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgv_BangLuong_CellClick);
-            this.dgv_BangLuong.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgv_BangLuong_CellContentClick);
             // 
             // frm_QuanLyLuong
             // 

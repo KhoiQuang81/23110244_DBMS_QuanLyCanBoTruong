@@ -1,44 +1,253 @@
 ﻿/*=========================
 	   1. PHÂN QUYỀN
   =========================*/
--- Tạo login (SQL Server Authentication demo)
--- Thực tế: mỗi user trong DB sẽ map vào 1 login
-CREATE LOGIN AdminLogin WITH PASSWORD = '123';
-CREATE LOGIN TruongKhoaLogin WITH PASSWORD = '123';
-CREATE LOGIN GiangVienLogin WITH PASSWORD = '123';
+  USE QLCanBoGiangVien;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'r_Admin')
+    CREATE ROLE r_Admin;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'r_TruongKhoa')
+    CREATE ROLE r_TruongKhoa;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'r_GiangVien')
+    CREATE ROLE r_GiangVien;
+GO
 
--- Tạo user trong DB
-CREATE USER AdminUser FOR LOGIN AdminLogin;
-CREATE USER TruongKhoaUser FOR LOGIN TruongKhoaLogin;
-CREATE USER GiangVienUser FOR LOGIN GiangVienLogin;
 
--- Tạo role
-CREATE ROLE AdminRole;
-CREATE ROLE TruongKhoaRole;
-CREATE ROLE GiangVienRole;
+-- Hàm lấy danh tính hiện tại (role, MaCB, MaKhoa) Dùng USER_NAME() để map sang TaiKhoan.Username
+  CREATE OR ALTER FUNCTION dbo.RTO_CurrentPrincipal()
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT  t.UserId,
+            u.FullName,
+            r.RoleName,
+            cb.MaCB,
+            cb.MaKhoa
+    FROM dbo.TaiKhoan t
+    JOIN dbo.Users u ON u.UserId = t.UserId
+    JOIN dbo.Role  r ON r.RoleId = u.RoleId
+    LEFT JOIN dbo.CanBo cb ON cb.UserId = u.UserId
+    WHERE t.Username = USER_NAME()
+);
+GO
 
--- Gán user vào role
-EXEC sp_addrolemember 'AdminRole', 'AdminUser';
-EXEC sp_addrolemember 'TruongKhoaRole', 'TruongKhoaUser';
-EXEC sp_addrolemember 'GiangVienRole', 'GiangVienUser';
+/* SAU KHI THÊM TÀI KHOẢN -> TỰ TẠO LOGIN/USER + ADD ROLE */
+CREATE OR ALTER TRIGGER TRG_TaiKhoan_AI
+ON dbo.TaiKhoan
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
--- Phân quyền
--- Admin: toàn quyền
-GRANT CONTROL ON DATABASE::QLCanBoGiangVien TO AdminRole;
+    DECLARE @u NVARCHAR(100), @p NVARCHAR(255), @role NVARCHAR(50), @sql NVARCHAR(MAX);
 
--- Trưởng khoa: CRUD giảng viên, môn học, lớp, phân công
-GRANT SELECT, INSERT, UPDATE, DELETE ON CanBo TO TruongKhoaRole;
-GRANT SELECT, INSERT, UPDATE, DELETE ON MonHoc TO TruongKhoaRole;
-GRANT SELECT, INSERT, UPDATE, DELETE ON LopHocPhan TO TruongKhoaRole;
-GRANT SELECT, INSERT, UPDATE, DELETE ON PhanCongGiangDay TO TruongKhoaRole;
+    SELECT TOP(1)
+        @u = i.Username,
+        @p = i.Password,
+        @role = r.RoleName
+    FROM inserted i
+    JOIN dbo.Users u ON u.UserId = i.UserId
+    JOIN dbo.Role  r ON r.RoleId = u.RoleId;
 
--- Giảng viên: chỉ SELECT, nhập điểm lớp mình
-GRANT SELECT ON CanBo TO GiangVienRole;
-GRANT SELECT ON MonHoc TO GiangVienRole;
-GRANT SELECT ON LopHocPhan TO GiangVienRole;
-GRANT SELECT, UPDATE ON SinhVien_Lop TO GiangVienRole;
-GRANT SELECT ON BangLuong TO GiangVienRole;
+    -- Tạo/đổi mật khẩu LOGIN
+    IF SUSER_ID(@u) IS NULL
+        SET @sql = N'CREATE LOGIN ' + QUOTENAME(@u) +
+                   N' WITH PASSWORD = ''' + REPLACE(@p,'''','''''') + N''', CHECK_POLICY=OFF, CHECK_EXPIRATION=OFF;';
+    ELSE
+        SET @sql = N'ALTER LOGIN ' + QUOTENAME(@u) +
+                   N' WITH PASSWORD = ''' + REPLACE(@p,'''','''''') + N''', CHECK_POLICY=OFF;';
+    EXEC(@sql);
 
+    -- Tạo USER trong database (nếu chưa có)
+    IF USER_ID(@u) IS NULL
+    BEGIN
+        SET @sql = N'CREATE USER ' + QUOTENAME(@u) + N' FOR LOGIN ' + QUOTENAME(@u) + N';';
+        EXEC(@sql);
+    END
+
+    -- Add vào ROLE
+    IF @role = N'Admin'
+        SET @sql = N'ALTER ROLE r_Admin ADD MEMBER ' + QUOTENAME(@u) + N';';
+    ELSE IF @role = N'TruongKhoa'
+        SET @sql = N'ALTER ROLE r_TruongKhoa ADD MEMBER ' + QUOTENAME(@u) + N';';
+    ELSE IF @role = N'GiangVien'
+        SET @sql = N'ALTER ROLE r_GiangVien ADD MEMBER ' + QUOTENAME(@u) + N';';
+    ELSE
+        SET @sql = NULL;
+
+    IF @sql IS NOT NULL EXEC(@sql);
+END
+GO
+
+/* XÓA TÀI KHOẢN -> DROP USER + LOGIN + GỠ ROLE */
+CREATE OR ALTER TRIGGER TRG_TaiKhoan_AD
+ON dbo.TaiKhoan
+AFTER DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @u NVARCHAR(100), @sql NVARCHAR(MAX);
+
+    SELECT TOP(1) @u = d.Username FROM deleted d;
+
+    -- Gỡ khỏi mọi role (thử từng role)
+    SET @sql = N'IF IS_ROLEMEMBER(''r_Admin'',''' + REPLACE(@u,'''','''''') + N''')=1 ALTER ROLE r_Admin DROP MEMBER ' + QUOTENAME(@u) + N';';
+    EXEC(@sql);
+    SET @sql = N'IF IS_ROLEMEMBER(''r_TruongKhoa'',''' + REPLACE(@u,'''','''''') + N''')=1 ALTER ROLE r_TruongKhoa DROP MEMBER ' + QUOTENAME(@u) + N';';
+    EXEC(@sql);
+    SET @sql = N'IF IS_ROLEMEMBER(''r_GiangVien'',''' + REPLACE(@u,'''','''''') + N''')=1 ALTER ROLE r_GiangVien DROP MEMBER ' + QUOTENAME(@u) + N';';
+    EXEC(@sql);
+
+    -- Drop USER
+    IF USER_ID(@u) IS NOT NULL
+    BEGIN
+        SET @sql = N'DROP USER ' + QUOTENAME(@u) + N';';
+        EXEC(@sql);
+    END
+
+    -- Drop LOGIN
+    IF SUSER_ID(@u) IS NOT NULL
+    BEGIN
+        SET @sql = N'DROP LOGIN ' + QUOTENAME(@u) + N';';
+        EXEC(@sql);
+    END
+END
+GO
+
+/* CẬP NHẬT TÊN/MẬT KHẨU -> ĐỔI LOGIN/USER TƯƠNG ỨNG */
+CREATE OR ALTER TRIGGER TRG_TaiKhoan_AU
+ON dbo.TaiKhoan
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @oldU NVARCHAR(100), @newU NVARCHAR(100), @newP NVARCHAR(255), @sql NVARCHAR(MAX);
+
+    SELECT TOP(1)
+        @oldU = d.Username, @newU = i.Username, @newP = i.Password
+    FROM inserted i CROSS JOIN deleted d;
+
+    IF UPDATE(Username) AND @oldU <> @newU
+    BEGIN
+        SET @sql = N'ALTER LOGIN ' + QUOTENAME(@oldU) + N' WITH NAME = ' + QUOTENAME(@newU) + N';';
+        EXEC(@sql);
+        IF USER_ID(@oldU) IS NOT NULL
+        BEGIN
+            SET @sql = N'ALTER USER ' + QUOTENAME(@oldU) + N' WITH NAME = ' + QUOTENAME(@newU) + N';';
+            EXEC(@sql);
+        END
+    END
+
+    IF UPDATE(Password)
+    BEGIN
+        DECLARE @target NVARCHAR(100) = CASE WHEN UPDATE(Username) AND @oldU <> @newU THEN @newU ELSE @oldU END;
+        SET @sql = N'ALTER LOGIN ' + QUOTENAME(@target) + N' WITH PASSWORD = ''' + REPLACE(@newP,'''','''''') + N''', CHECK_POLICY=OFF;';
+        EXEC(@sql);
+    END
+END
+GO
+
+-- Test login với giảng viên
+EXECUTE AS USER = 'vdbao';
+SELECT USER_NAME() AS CurrentUser;
+SELECT r.name AS RoleName
+FROM sys.database_role_members drm
+JOIN sys.database_principals r ON r.principal_id = drm.role_principal_id
+JOIN sys.database_principals m ON m.principal_id = drm.member_principal_id
+WHERE m.name = USER_NAME();
+REVERT;
+
+
+-- GRANT QUYỀN
+
+-- Cho tất cả role được phép gọi hàm RTO_CurrentPrincipal
+GRANT SELECT ON OBJECT::dbo.RTO_CurrentPrincipal TO r_Admin;
+GRANT SELECT ON OBJECT::dbo.RTO_CurrentPrincipal TO r_TruongKhoa;
+GRANT SELECT ON OBJECT::dbo.RTO_CurrentPrincipal TO r_GiangVien;
+
+
+-- ADMIN: toàn quyền schema dbo
+GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO r_Admin;
+GRANT EXECUTE ON SCHEMA::dbo TO r_Admin;
+
+
+-- Trưởng khoa: EXECUTE các SP kiểm tra khoa
+-- Khoa + Ngành
+GRANT EXECUTE ON dbo.NonP_GetAllKhoa         TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetNganhByKhoa     TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_InsertNganh        TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_UpdateNganh        TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_DeleteNganh        TO r_TruongKhoa;
+
+-- Giảng viên (CanBo)
+GRANT EXECUTE ON dbo.HasP_GetGiangVienByKhoa TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetGiangVienByKhoa_GV TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_InsertCanBo        TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_UpdateCanBo        TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_DeleteCanBo        TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetCanBoByName     TO r_TruongKhoa;
+
+
+-- Môn học
+GRANT EXECUTE ON dbo.HasP_InsertMonHoc				TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_UpdateMonHoc				TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_DeleteMonHoc				TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetChuongTrinhByNganh		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetMonHocByCT				TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_SearchMonHoc				TO r_TruongKhoa;
+
+
+-- Lớp học phần
+GRANT EXECUTE ON dbo.HasP_InsertLopHocPhan		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_UpdateLopHocPhan		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_DeleteLopHocPhan		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetLopHocPhanByMon	TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetMonHocByNganh		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetLopChuaPhanCong	TO r_TruongKhoa;
+
+
+-- Phân công
+GRANT EXECUTE ON dbo.HasP_GetPhanCongByKhoa		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_InsertPhanCong		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_UpdatePhanCong		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_DeletePhanCong		TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetMonHocByNganh_PC   TO r_TruongKhoa;
+GRANT EXECUTE ON dbo.HasP_GetSoTietByMon		TO r_TruongKhoa;
+
+
+-- Lương: chỉ xem
+GRANT SELECT  ON dbo.Vw_CanBo_Luong          TO r_TruongKhoa;
+GRANT SELECT ON dbo.Vw_Khoa_CuaToi TO r_TruongKhoa;
+GRANT SELECT ON dbo.Vw_Nganh_TrongKhoaCuaToi TO r_TruongKhoa;
+
+-- Hồ sơ cá nhân: cho phép update hồ sơ của chính mình
+GRANT EXECUTE ON dbo.Re_UpdateHoSoCaNhan     TO r_TruongKhoa;
+
+
+
+-- Giảng viên: chỉ SELECT view an toàn
+GRANT SELECT ON dbo.Vw_CanBo_TrongKhoaCuaToi		TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_Nganh_TrongKhoaCuaToi		TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_MonHoc_TrongKhoaCuaToi		TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_LopHP_TrongKhoaCuaToi		TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_LopHP_CuaToi					TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_PhanCong_CuaToi				TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_CanBo_Luong					TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetCanBoByName			TO r_GiangVien;
+GRANT SELECT ON dbo.Vw_Khoa_CuaToi					TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetChuongTrinhByNganh		TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetMonHocByCT				TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_SearchMonHoc				TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetLopHocPhanByMon		TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetMonHocByNganh			TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetNganhByKhoa			TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetMonHocByNganh_PC		TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetSoTietByMon			TO r_GiangVien;
+GRANT EXECUTE ON dbo.HasP_GetLopChuaPhanCong		TO r_GiangVien;
+
+
+-- Hồ sơ cá nhân: update thông tin của chính mình
+GRANT EXECUTE ON dbo.Re_UpdateHoSoCaNhan			TO r_GiangVien;
 
 
 
@@ -86,126 +295,110 @@ EXEC Re_InsertBangLuong '1980', '2025-09', 6000000, 2, 500000, 200000;
 
 
 -------------------------------------------------------------
--- CRUD: SinhVien
--------------------------------------------------------------
-CREATE OR ALTER PROCEDURE HasP_InsertSinhVien
- @MaSV NVARCHAR(20),
- @HoTen NVARCHAR(150),
- @NgaySinh DATE,
- @GioiTinh CHAR(1),
- @MaKhoa NVARCHAR(20),
- @MaNganh NVARCHAR(20),
- @MaCT NVARCHAR(20),
- @MaLop NVARCHAR(20)
-AS
-BEGIN
- INSERT INTO SinhVien(MaSV, HoTen, NgaySinh, GioiTinh, MaKhoa, MaNganh, MaCT, MaLop)
- VALUES(@MaSV, @HoTen, @NgaySinh, @GioiTinh, @MaKhoa, @MaNganh, @MaCT, @MaLop);
-END;
-GO
-
-CREATE OR ALTER PROCEDURE HasP_UpdateSinhVien
- @MaSV NVARCHAR(20),
- @HoTen NVARCHAR(150),
- @NgaySinh DATE,
- @GioiTinh CHAR(1),
- @MaKhoa NVARCHAR(20),
- @MaNganh NVARCHAR(20),
- @MaCT NVARCHAR(20),
- @MaLop NVARCHAR(20)
-AS
-BEGIN
- UPDATE SinhVien
- SET HoTen=@HoTen, NgaySinh=@NgaySinh, GioiTinh=@GioiTinh,
-     MaKhoa=@MaKhoa, MaNganh=@MaNganh, MaCT=@MaCT, MaLop=@MaLop
- WHERE MaSV=@MaSV;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE HasP_DeleteSinhVien
- @MaSV NVARCHAR(20)
-AS
-BEGIN
- DELETE FROM SinhVien WHERE MaSV=@MaSV;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE NonP_GetAllSinhVien
-AS
-BEGIN
- SELECT * FROM SinhVien;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE HasP_GetSinhVienById
- @MaSV NVARCHAR(20)
-AS
-BEGIN
- SELECT * FROM SinhVien WHERE MaSV=@MaSV;
-END;
-GO
-
-
--- Insert
-EXEC HasP_InsertSinhVien '23110353', N'Vũ Quốc Trung', '2005-01-09', 'M', '05', '7480201', 'CNTT01', '231101A';
--- Update
-EXEC HasP_UpdateSinhVien '23110353', N'Vũ Quốc Trung', '2005-01-09', 'F', '05', '7480201', 'CNTT01', '231101A';
--- Select by Id
-EXEC HasP_GetSinhVienById '23110353';
--- Select all
-EXEC NonP_GetAllSinhVien;
--- Delete
-EXEC HasP_DeleteSinhVien '23110353';
-
-
--------------------------------------------------------------
 -- CRUD: CanBo
 -------------------------------------------------------------
-CREATE OR ALTER PROCEDURE HasP_InsertCanBo
- @MaCB NVARCHAR(20),
- @HoTen NVARCHAR(150),
- @NgaySinh DATE,
- @GioiTinh CHAR(1),
- @Email NVARCHAR(150),
- @Phone NVARCHAR(20),
- @MaKhoa NVARCHAR(20),
- @MaChucVu NVARCHAR(20),
- @MaTrinhDo NVARCHAR(5)
+CREATE OR ALTER PROCEDURE dbo.HasP_InsertCanBo
+    @MaCB NVARCHAR(20),
+    @HoTen NVARCHAR(200),
+    @NgaySinh DATE,
+    @GioiTinh NVARCHAR(5),
+    @Email NVARCHAR(100),
+    @Phone NVARCHAR(20),
+    @MaKhoa NVARCHAR(20),
+    @MaChucVu NVARCHAR(20),
+    @MaTrinhDo NVARCHAR(20)
 AS
 BEGIN
- INSERT INTO CanBo(MaCB, HoTen, NgaySinh, GioiTinh, Email, Phone,
-                   MaKhoa, MaChucVu, MaTrinhDo)
- VALUES(@MaCB, @HoTen, @NgaySinh, @GioiTinh, @Email, @Phone,
-        @MaKhoa, @MaChucVu, @MaTrinhDo);
-END;
+    -- Kiểm tra nhập thiếu
+    IF @MaCB IS NULL OR LTRIM(RTRIM(@MaCB)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã cán bộ.', 16, 1); RETURN;
+    IF @HoTen IS NULL OR LTRIM(RTRIM(@HoTen)) = ''
+        RAISERROR(N'Bạn chưa nhập Họ tên.', 16, 1); RETURN;
+    IF @MaKhoa IS NULL OR LTRIM(RTRIM(@MaKhoa)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã khoa.', 16, 1); RETURN;
+    IF @MaChucVu IS NULL OR LTRIM(RTRIM(@MaChucVu)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã chức vụ.', 16, 1); RETURN;
+    IF @MaTrinhDo IS NULL OR LTRIM(RTRIM(@MaTrinhDo)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã trình độ.', 16, 1); RETURN;
+
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa
+    FROM dbo.RTO_CurrentPrincipal();
+
+    IF @role <> N'Admin' AND @mk <> @MaKhoa
+        RAISERROR(N'Không thêm giảng viên ngoài khoa của bạn.', 16, 1);
+    ELSE
+        INSERT INTO dbo.CanBo(MaCB, HoTen, NgaySinh, GioiTinh, Email, Phone, MaKhoa, MaChucVu, MaTrinhDo)
+        VALUES(@MaCB, @HoTen, @NgaySinh, @GioiTinh, @Email, @Phone, @MaKhoa, @MaChucVu, @MaTrinhDo);
+END
 GO
 
-CREATE OR ALTER PROCEDURE HasP_UpdateCanBo
- @MaCB NVARCHAR(20),
- @HoTen NVARCHAR(150),
- @NgaySinh DATE,
- @GioiTinh CHAR(1),
- @Email NVARCHAR(150),
- @Phone NVARCHAR(20),
- @MaKhoa NVARCHAR(20),
- @MaChucVu NVARCHAR(20),
- @MaTrinhDo NVARCHAR(5)
+CREATE OR ALTER PROCEDURE dbo.HasP_UpdateCanBo
+    @MaCB NVARCHAR(20),
+    @HoTen NVARCHAR(200),
+    @NgaySinh DATE,
+    @GioiTinh NVARCHAR(5),
+    @Email NVARCHAR(100),
+    @Phone NVARCHAR(20),
+    @MaKhoa NVARCHAR(20),
+    @MaChucVu NVARCHAR(20),
+    @MaTrinhDo NVARCHAR(20)
 AS
 BEGIN
- UPDATE CanBo
- SET HoTen=@HoTen, NgaySinh=@NgaySinh, GioiTinh=@GioiTinh,
-     Email=@Email, Phone=@Phone,
-     MaKhoa=@MaKhoa, MaChucVu=@MaChucVu, MaTrinhDo=@MaTrinhDo
- WHERE MaCB=@MaCB;
-END;
+    -- Kiểm tra nhập thiếu
+    IF @MaCB IS NULL OR LTRIM(RTRIM(@MaCB)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã cán bộ.', 16, 1); RETURN;
+    IF @HoTen IS NULL OR LTRIM(RTRIM(@HoTen)) = ''
+        RAISERROR(N'Bạn chưa nhập Họ tên.', 16, 1); RETURN;
+    IF @MaKhoa IS NULL OR LTRIM(RTRIM(@MaKhoa)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã khoa.', 16, 1); RETURN;
+    IF @MaChucVu IS NULL OR LTRIM(RTRIM(@MaChucVu)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã chức vụ.', 16, 1); RETURN;
+    IF @MaTrinhDo IS NULL OR LTRIM(RTRIM(@MaTrinhDo)) = ''
+        RAISERROR(N'Bạn chưa nhập Mã trình độ.', 16, 1); RETURN;
+
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa
+    FROM dbo.RTO_CurrentPrincipal();
+
+    SELECT @target = cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB = @MaCB;
+
+    IF @target IS NULL
+        RAISERROR(N'Cán bộ không tồn tại.', 16, 1);
+    ELSE IF @role <> N'Admin' AND @target <> @mk
+        RAISERROR(N'Không sửa giảng viên ngoài khoa của bạn.', 16, 1);
+    ELSE
+        UPDATE dbo.CanBo
+        SET HoTen = @HoTen,
+            NgaySinh = @NgaySinh,
+            GioiTinh = @GioiTinh,
+            Email = @Email,
+            Phone = @Phone,
+            MaKhoa = @MaKhoa,
+            MaChucVu = @MaChucVu,
+            MaTrinhDo = @MaTrinhDo
+        WHERE MaCB = @MaCB;
+END
 GO
 
-CREATE OR ALTER PROCEDURE HasP_DeleteCanBo
- @MaCB NVARCHAR(20)
+
+CREATE OR ALTER PROCEDURE dbo.HasP_DeleteCanBo
+    @MaCB NVARCHAR(20)
 AS
 BEGIN
- DELETE FROM CanBo WHERE MaCB=@MaCB;
-END;
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa
+    FROM dbo.RTO_CurrentPrincipal();
+
+    SELECT @target = cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB = @MaCB;
+
+    IF @target IS NULL
+        RAISERROR(N'Cán bộ không tồn tại.', 16, 1);
+    ELSE IF @role <> N'Admin' AND @target <> @mk
+        RAISERROR(N'Không xóa giảng viên ngoài khoa của bạn.', 16, 1);
+    ELSE
+        DELETE FROM dbo.CanBo WHERE MaCB = @MaCB;
+END
 GO
 
 CREATE OR ALTER PROCEDURE NonP_GetAllCanBo
@@ -215,24 +408,28 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER PROCEDURE HasP_GetCanBoById
- @MaCB NVARCHAR(20)
+CREATE OR ALTER PROCEDURE dbo.HasP_GetCanBoByName
+    @HoTen NVARCHAR(200)
 AS
 BEGIN
- SELECT * FROM CanBo WHERE MaCB=@MaCB;
-END;
-GO
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa
+    FROM dbo.RTO_CurrentPrincipal();
 
-CREATE OR ALTER PROCEDURE HasP_GetCanBoByName
-    @HoTen NVARCHAR(150)
-AS
-BEGIN
-    SELECT * 
-    FROM CanBo
-    WHERE HoTen LIKE '%' + @HoTen + '%';
-END;
+    IF @role = N'Admin'
+    BEGIN
+        SELECT MaCB, HoTen, MaKhoa, MaChucVu, MaTrinhDo, Email, Phone, NgaySinh, GioiTinh
+        FROM dbo.CanBo
+        WHERE HoTen LIKE N'%' + @HoTen + N'%';
+    END
+    ELSE
+    BEGIN
+        SELECT MaCB, HoTen, MaKhoa, MaChucVu, MaTrinhDo, Email, Phone, NgaySinh, GioiTinh
+        FROM dbo.CanBo
+        WHERE HoTen LIKE N'%' + @HoTen + N'%' AND MaKhoa = @mk;
+    END
+END
 GO
-
 
 EXEC HasP_InsertCanBo '2020', N'Vũ Đình Bảo', '1993-05-20', 'M', 'baovd@hcmute.edu.vn', '0909999999', '05', 'GV', 'ThS', NULL;
 EXEC HasP_UpdateCanBo '2020', N'Vũ Đình Bảo', '1993-05-20', 'M', 'baovd@hcmute.edu.vn', '0909999999', '05', 'GV', 'TS';
@@ -257,75 +454,100 @@ BEGIN
     WHERE ct.MaNganh = @MaNganh;
 END;
 GO
--- Thêm môn học vào ngành
-CREATE OR ALTER PROCEDURE HasP_InsertMonHoc
+
+-- INSERT môn học đầy đủ
+CREATE OR ALTER PROCEDURE dbo.HasP_InsertMonHoc
     @MaMon NVARCHAR(20),
     @TenMon NVARCHAR(200),
     @SoTiet INT,
     @SoTinChi INT,
+    @MaKhoaPhuTrach NVARCHAR(20),
     @MaCT NVARCHAR(20),
-    @BatBuoc BIT,
-    @MaKhoaPhuTrach NVARCHAR(5)  -- thêm tham số mới
+    @BatBuoc BIT
 AS
 BEGIN
-    BEGIN TRY
-        BEGIN TRAN;
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa FROM dbo.RTO_CurrentPrincipal();
 
-        INSERT INTO MonHoc (MaMon, TenMon, SoTiet, SoTinChi, MaKhoaPhuTrach)
-        VALUES (@MaMon, @TenMon, @SoTiet, @SoTinChi, @MaKhoaPhuTrach);
+    IF @role <> N'Admin' AND @MaKhoaPhuTrach <> @mk
+        RAISERROR(N'Không thêm môn ngoài khoa của bạn.', 16, 1);
+    ELSE
+    BEGIN
+        -- Nếu môn chưa tồn tại thì thêm mới
+        IF NOT EXISTS (SELECT 1 FROM dbo.MonHoc WHERE MaMon = @MaMon)
+        BEGIN
+            INSERT INTO dbo.MonHoc(MaMon, TenMon, SoTiet, SoTinChi, MaKhoaPhuTrach)
+            VALUES(@MaMon, @TenMon, @SoTiet, @SoTinChi, @MaKhoaPhuTrach);
+        END
 
-        INSERT INTO ChuongTrinh_MonHoc (MaCT, MaMon, BatBuoc)
-        VALUES (@MaCT, @MaMon, @BatBuoc);
-
-        COMMIT TRAN;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRAN;
-        THROW;
-    END CATCH
-END;
+        -- Thêm vào chương trình - môn học
+        INSERT INTO dbo.ChuongTrinh_MonHoc(MaCT, MaMon, BatBuoc)
+        VALUES(@MaCT, @MaMon, @BatBuoc);
+    END
+END
 GO
 
--- Sửa môn học
-CREATE OR ALTER PROCEDURE HasP_UpdateMonHoc
+
+-- UPDATE môn học đầy đủ
+CREATE OR ALTER PROCEDURE dbo.HasP_UpdateMonHoc
     @MaMon NVARCHAR(20),
     @TenMon NVARCHAR(200),
     @SoTiet INT,
     @SoTinChi INT,
-    @BatBuoc BIT,
-    @MaKhoaPhuTrach NVARCHAR(5)
+    @MaKhoaPhuTrach NVARCHAR(20),
+    @MaCT NVARCHAR(20),
+    @BatBuoc BIT
 AS
 BEGIN
-    UPDATE MonHoc
-    SET TenMon = @TenMon, 
-        SoTiet = @SoTiet, 
-        SoTinChi = @SoTinChi,
-        MaKhoaPhuTrach = @MaKhoaPhuTrach
-    WHERE MaMon = @MaMon;
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa FROM dbo.RTO_CurrentPrincipal();
+    SELECT @target = MaKhoaPhuTrach FROM dbo.MonHoc WHERE MaMon = @MaMon;
 
-    UPDATE ChuongTrinh_MonHoc
-    SET BatBuoc = @BatBuoc
-    WHERE MaMon = @MaMon;
-END;
+    IF @target IS NULL
+        RAISERROR(N'Môn học không tồn tại.', 16, 1);
+    ELSE IF @role <> N'Admin' AND @target <> @mk
+        RAISERROR(N'Không sửa môn ngoài khoa của bạn.', 16, 1);
+    ELSE
+    BEGIN
+        UPDATE dbo.MonHoc
+        SET TenMon = @TenMon,
+            SoTiet = @SoTiet,
+            SoTinChi = @SoTinChi,
+            MaKhoaPhuTrach = @MaKhoaPhuTrach
+        WHERE MaMon = @MaMon;
+
+        UPDATE dbo.ChuongTrinh_MonHoc
+        SET BatBuoc = @BatBuoc
+        WHERE MaCT = @MaCT AND MaMon = @MaMon;
+    END
+END
 GO
 
 
--- Xóa môn học
-CREATE OR ALTER PROCEDURE HasP_DeleteMonHoc
-    @MaMon NVARCHAR(20)
+
+-- DELETE môn học
+CREATE OR ALTER PROCEDURE dbo.HasP_DeleteMonHoc
+    @MaMon NVARCHAR(20),
+    @MaCT NVARCHAR(20)
 AS
 BEGIN
-    DELETE FROM ChuongTrinh_MonHoc WHERE MaMon = @MaMon;
-    DELETE FROM MonHoc WHERE MaMon = @MaMon;
-END;
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role = RoleName, @mk = MaKhoa FROM dbo.RTO_CurrentPrincipal();
+    SELECT @target = MaKhoaPhuTrach FROM dbo.MonHoc WHERE MaMon = @MaMon;
+
+    IF @target IS NULL
+        RAISERROR(N'Môn học không tồn tại.', 16, 1);
+    ELSE IF @role <> N'Admin' AND @target <> @mk
+        RAISERROR(N'Không xóa môn ngoài khoa của bạn.', 16, 1);
+    ELSE
+    BEGIN
+        DELETE FROM dbo.ChuongTrinh_MonHoc WHERE MaCT = @MaCT AND MaMon = @MaMon;
+
+        IF NOT EXISTS (SELECT 1 FROM dbo.ChuongTrinh_MonHoc WHERE MaMon = @MaMon)
+            DELETE FROM dbo.MonHoc WHERE MaMon = @MaMon;
+    END
+END
 GO
-
-
-
-EXEC HasP_InsertMonHoc 'DBMS', N'Hệ quản trị ', 75, 4, '05';
-EXEC HasP_UpdateMonHoc 'DBMS', N'Hệ quản trị ', 60, 3, '05';
-EXEC HasP_GetMonHocById 'DBMS';
-EXEC HasP_DeleteMonHoc 'DBMS';
 
 
 CREATE OR ALTER PROCEDURE HasP_GetNganhByKhoa
@@ -374,23 +596,118 @@ END;
 --------------------------------------------------------
 -- Thêm lớp học phần
 --------------------------------------------------------
-CREATE OR ALTER PROCEDURE HasP_InsertLopHocPhan
+-- INSERT: tạo mã lớp và tên lớp tự động từ @MaMon + @SoThuTu
+CREATE OR ALTER PROCEDURE dbo.HasP_InsertLopHocPhan
     @MaMon NVARCHAR(20),
     @SoThuTu INT,
-    @MaKhoa NVARCHAR(20),
-    @MaNganh NVARCHAR(20),
-    @MaCT NVARCHAR(20),
     @SoLuongSV INT
 AS
 BEGIN
-    DECLARE @MaLopHocPhan NVARCHAR(30);
-    SET @MaLopHocPhan = @MaMon + '_' + RIGHT('00' + CAST(@SoThuTu AS NVARCHAR(2)), 2);
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20),
+            @khoaMon NVARCHAR(20), @tenMon NVARCHAR(200),
+            @MaLop NVARCHAR(32), @TenLop NVARCHAR(250);
 
-    INSERT INTO LopHocPhan(MaLopHocPhan, MaMon, TenLopHocPhan, MaKhoa, MaNganh, MaCT, SoLuongSV)
-    SELECT @MaLopHocPhan, @MaMon, TenMon, @MaKhoa, @MaNganh, @MaCT, @SoLuongSV
-    FROM MonHoc
-    WHERE MaMon = @MaMon;
-END;
+    SELECT TOP(1) @role=RoleName, @mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
+    SELECT @khoaMon = MaKhoaPhuTrach, @tenMon = TenMon
+    FROM dbo.MonHoc WHERE MaMon = @MaMon;
+
+    IF @khoaMon IS NULL
+        RAISERROR(N'Môn học không tồn tại.',16,1);
+    ELSE IF @role <> N'Admin' AND @khoaMon <> @mk
+        RAISERROR(N'Không thêm lớp ngoài khoa của bạn.',16,1);
+    ELSE
+    BEGIN
+        -- Mã lớp dạng MaMon_XX (01, 02, 03, ...)
+        SET @MaLop = @MaMon + N'_' + RIGHT('00' + CAST(@SoThuTu AS NVARCHAR(2)),2);
+
+        -- Tên lớp = tên môn (không thêm đuôi nhóm)
+        SET @TenLop = @tenMon;
+
+        IF EXISTS (SELECT 1 FROM dbo.LopHocPhan WHERE MaLopHocPhan = @MaLop)
+            RAISERROR(N'Mã lớp đã tồn tại.',16,1);
+        ELSE
+            INSERT dbo.LopHocPhan(MaLopHocPhan, TenLopHocPhan, MaMon, SoLuongSV)
+            VALUES(@MaLop, @TenLop, @MaMon, @SoLuongSV);
+    END
+END
+GO
+
+
+CREATE OR ALTER PROCEDURE dbo.HasP_UpdateLopHocPhan
+    @OldMaLopHocPhan NVARCHAR(20),
+    @SoThuTu INT,
+    @SoLuongSV INT
+AS
+BEGIN
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20),
+            @targetKhoa NVARCHAR(20),
+            @MaMon NVARCHAR(20), @TenMon NVARCHAR(200),
+            @NewMaLop NVARCHAR(32), @NewTenLop NVARCHAR(250);
+
+    SELECT TOP(1) @role=RoleName, @mk=MaKhoa 
+    FROM dbo.RTO_CurrentPrincipal();
+
+    -- Lấy thông tin lớp cũ
+    SELECT lhp.MaMon, mh.TenMon, mh.MaKhoaPhuTrach
+    INTO #tmp
+    FROM dbo.LopHocPhan lhp
+    JOIN dbo.MonHoc mh ON lhp.MaMon = mh.MaMon
+    WHERE lhp.MaLopHocPhan = @OldMaLopHocPhan;
+
+    IF NOT EXISTS (SELECT 1 FROM #tmp)
+    BEGIN
+        RAISERROR(N'Lớp học phần không tồn tại.',16,1);
+        RETURN;
+    END
+
+    SELECT @MaMon=MaMon, @TenMon=TenMon, @targetKhoa=MaKhoaPhuTrach FROM #tmp;
+    DROP TABLE #tmp;
+
+    IF @role <> N'Admin' AND @targetKhoa <> @mk
+        RAISERROR(N'Không sửa lớp ngoài khoa của bạn.',16,1);
+    ELSE
+    BEGIN
+        -- Sinh mã lớp mới theo số thứ tự
+        SET @NewMaLop = @MaMon + N'_' + RIGHT('00' + CAST(@SoThuTu AS NVARCHAR(2)),2);
+
+        -- Tên lớp = tên môn (không đổi)
+        SET @NewTenLop = @TenMon;
+
+        -- Nếu mã mới trùng lớp khác thì báo lỗi
+        IF EXISTS (SELECT 1 FROM dbo.LopHocPhan WHERE MaLopHocPhan=@NewMaLop AND MaLopHocPhan<>@OldMaLopHocPhan)
+            RAISERROR(N'Mã lớp mới đã tồn tại.',16,1);
+        ELSE
+            UPDATE dbo.LopHocPhan
+            SET MaLopHocPhan = @NewMaLop,
+                TenLopHocPhan = @NewTenLop,
+                SoLuongSV = @SoLuongSV
+            WHERE MaLopHocPhan = @OldMaLopHocPhan;
+    END
+END
+GO
+
+
+CREATE OR ALTER PROCEDURE dbo.HasP_DeleteLopHocPhan
+    @MaLopHocPhan NVARCHAR(20)
+AS
+BEGIN
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role=RoleName, @mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
+
+    SELECT @target = mh.MaKhoaPhuTrach
+    FROM dbo.LopHocPhan lhp
+    JOIN dbo.MonHoc mh ON lhp.MaMon = mh.MaMon
+    WHERE lhp.MaLopHocPhan = @MaLopHocPhan;
+
+    IF @target IS NULL
+        RAISERROR(N'Lớp học phần không tồn tại.',16,1);
+    ELSE IF @role <> N'Admin' AND @target <> @mk
+        RAISERROR(N'Không xóa lớp ngoài khoa của bạn.',16,1);
+    ELSE
+        DELETE FROM dbo.LopHocPhan WHERE MaLopHocPhan = @MaLopHocPhan;
+END
+GO
+
 
 
 
@@ -545,62 +862,43 @@ BEGIN
 END;
 GO
 
--- Thêm lớp học phần
-CREATE OR ALTER PROCEDURE HasP_InsertLopHocPhan
-    @MaLopHocPhan NVARCHAR(20),
-    @TenLopHocPhan NVARCHAR(200),
-    @MaKhoa NVARCHAR(20),
-    @MaNganh NVARCHAR(20),
-    @MaCT NVARCHAR(20)
-AS
-BEGIN
-    INSERT INTO LopHocPhan(MaLopHocPhan, TenLopHocPhan, MaKhoa, MaNganh, MaCT, SoLuongSV)
-    VALUES(@MaLopHocPhan, @TenLopHocPhan, @MaKhoa, @MaNganh, @MaCT, 0);
-END;
-GO
-
--- Sửa lớp học phần
-CREATE OR ALTER PROCEDURE HasP_UpdateLopHocPhan
-    @MaLopHocPhan NVARCHAR(20),
-    @TenLopHocPhan NVARCHAR(200),
-    @MaKhoa NVARCHAR(20),
-    @MaNganh NVARCHAR(20),
-    @MaCT NVARCHAR(20)
-AS
-BEGIN
-    UPDATE LopHocPhan
-    SET TenLopHocPhan = @TenLopHocPhan,
-        MaKhoa = @MaKhoa,
-        MaNganh = @MaNganh,
-        MaCT = @MaCT
-    WHERE MaLopHocPhan = @MaLopHocPhan;
-END;
-GO
-
--- Xóa lớp học phần
-CREATE OR ALTER PROCEDURE HasP_DeleteLopHocPhan
-    @MaLopHocPhan NVARCHAR(20)
-AS
-BEGIN
-    DELETE FROM LopHocPhan WHERE MaLopHocPhan = @MaLopHocPhan;
-END;
-GO
 
 
 -------------------------------------------------------------
 -- CRUD: Phân công
 -------------------------------------------------------------
 -- Giảng viên theo khoa
-CREATE OR ALTER PROCEDURE HasP_GetGiangVienByKhoa
+CREATE OR ALTER PROCEDURE dbo.HasP_GetGiangVienByKhoa @MaKhoa NVARCHAR(20)
+AS
+BEGIN
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20);
+    SELECT TOP(1) @role=RoleName,@mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
+
+    IF @role<>N'Admin' AND @MaKhoa<>@mk
+        RAISERROR(N'Không có quyền xem giảng viên ngoài khoa của bạn.',16,1);
+    ELSE
+        SELECT MaCB,HoTen,MaKhoa,MaBacLuong,PhuCap FROM dbo.CanBo WHERE MaKhoa=@MaKhoa;
+END
+GO
+
+CREATE OR ALTER PROCEDURE dbo.HasP_GetGiangVienByKhoa_GV
     @MaKhoa NVARCHAR(20)
 AS
 BEGIN
-    SELECT MaCB, HoTen
-    FROM CanBo
-    WHERE MaKhoa = @MaKhoa
-    ORDER BY HoTen;
-END;
-GO
+    SELECT cb.MaCB,
+           cb.HoTen,
+           cb.MaKhoa,
+           cb.MaChucVu,
+           cb.MaTrinhDo,
+           cb.Email,
+           cb.Phone,
+           cb.NgaySinh,
+           cb.GioiTinh
+    FROM dbo.CanBo cb
+    CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+    WHERE cb.MaKhoa = @MaKhoa
+      AND (cp.RoleName = N'Admin' OR cp.MaKhoa = @MaKhoa);
+END
 
 -- Danh sách ngành theo khoa
 CREATE OR ALTER PROCEDURE HasP_GetNganhByKhoa
@@ -653,88 +951,94 @@ END;
 GO
 
 -- Thêm phân công
-CREATE OR ALTER PROCEDURE HasP_InsertPhanCong
+CREATE OR ALTER PROCEDURE dbo.HasP_InsertPhanCong
+    @MaLopHocPhan NVARCHAR(20),
     @MaCB NVARCHAR(20),
     @MaMon NVARCHAR(20),
-    @MaLopHocPhan NVARCHAR(20),
     @SoTiet INT,
     @SoTuan INT,
     @HocKy INT,
-    @NamHoc NVARCHAR(9),
-    @MaNganh NVARCHAR(20)   -- thêm tham số ngành
+    @NamHoc NVARCHAR(20),
+	@MaNganh NVARCHAR(20)
 AS
 BEGIN
-    IF EXISTS (SELECT 1 FROM PhanCongGiangDay
-               WHERE MaLopHocPhan=@MaLopHocPhan
-                 AND HocKy=@HocKy AND NamHoc=@NamHoc)
-    BEGIN
-        RAISERROR(N'Lớp học phần đã được phân công kỳ/năm này',16,1); 
-        RETURN;
-    END;
+    DECLARE @role NVARCHAR(50),@mk NVARCHAR(20),@target NVARCHAR(20);
+    SELECT TOP(1) @role=RoleName,@mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
+    SELECT @target=cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB=@MaCB;
 
-    DECLARE @TenMon NVARCHAR(200) = (SELECT TenMon FROM MonHoc WHERE MaMon=@MaMon);
-
-    INSERT INTO PhanCongGiangDay(MaCB, MaMon, TenMon, MaLopHocPhan, SoTiet, SoTuan, HocKy, NamHoc, MaNganh)
-    VALUES(@MaCB, @MaMon, @TenMon, @MaLopHocPhan, @SoTiet, @SoTuan, @HocKy, @NamHoc, @MaNganh);
-END;
+    IF @role<>N'Admin' AND @target<>@mk
+        RAISERROR(N'Không phân công giảng viên ngoài khoa.',16,1);
+    ELSE
+        INSERT INTO dbo.PhanCongGiangDay
+        (MaLopHocPhan,MaCB,MaNganh,MaMon,SoTiet,SoTuan,HocKy,NamHoc)
+        VALUES(@MaLopHocPhan,@MaCB,@MaNganh,@MaMon,@SoTiet,@SoTuan,@HocKy,@NamHoc);
+END
 GO
 
 
--- Update phân công
-CREATE OR ALTER PROCEDURE HasP_UpdatePhanCong
-    @Old_MaCB NVARCHAR(20),
-    @Old_MaMon NVARCHAR(20),
-    @Old_MaLopHocPhan NVARCHAR(20),
-    @Old_HocKy INT,
-    @Old_NamHoc NVARCHAR(9),
-
-    @New_MaMon NVARCHAR(20),
-    @New_MaLopHocPhan NVARCHAR(20),
-    @New_SoTiet INT,
-    @New_SoTuan INT,
-    @New_HocKy INT,
-    @New_NamHoc NVARCHAR(9),
-    @New_MaNganh NVARCHAR(20)   -- thêm ngành
+CREATE OR ALTER PROCEDURE dbo.HasP_UpdatePhanCong
+    @OldMaLopHocPhan NVARCHAR(20),
+    @OldMaCB NVARCHAR(20),
+    @OldHocKy INT,
+    @OldNamHoc NVARCHAR(20),
+    @NewMaLopHocPhan NVARCHAR(20),
+    @NewMaCB NVARCHAR(20),
+    @NewMaNganh NVARCHAR(20),
+    @NewMaMon NVARCHAR(20),
+    @NewSoTiet INT,
+    @NewSoTuan INT,
+    @NewHocKy INT,
+    @NewNamHoc NVARCHAR(20)
 AS
 BEGIN
-    IF EXISTS (SELECT 1 FROM PhanCongGiangDay
-               WHERE MaLopHocPhan=@New_MaLopHocPhan
-                 AND HocKy=@New_HocKy AND NamHoc=@New_NamHoc
-                 AND NOT (MaCB=@Old_MaCB AND MaMon=@Old_MaMon 
-                          AND MaLopHocPhan=@Old_MaLopHocPhan 
-                          AND HocKy=@Old_HocKy AND NamHoc=@Old_NamHoc))
-    BEGIN
-        RAISERROR(N'Lớp học phần đã được phân công kỳ/năm này',16,1); RETURN;
-    END;
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role=RoleName, @mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
 
-    UPDATE PhanCongGiangDay
-    SET MaMon=@New_MaMon,
-        TenMon=(SELECT TenMon FROM MonHoc WHERE MaMon=@New_MaMon),
-        MaLopHocPhan=@New_MaLopHocPhan,
-        SoTiet=@New_SoTiet,
-        SoTuan=@New_SoTuan,
-        HocKy=@New_HocKy,
-        NamHoc=@New_NamHoc,
-        MaNganh=@New_MaNganh
-    WHERE MaCB=@Old_MaCB AND MaMon=@Old_MaMon AND MaLopHocPhan=@Old_MaLopHocPhan
-          AND HocKy=@Old_HocKy AND NamHoc=@Old_NamHoc;
-END;
+    SELECT @target=cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB=@NewMaCB;
+
+    IF @target IS NULL
+        RAISERROR(N'Giảng viên mới không tồn tại.',16,1);
+    ELSE IF @role<>N'Admin' AND @target<>@mk
+        RAISERROR(N'Không phân công giảng viên ngoài khoa.',16,1);
+    ELSE
+        UPDATE dbo.PhanCongGiangDay
+        SET MaLopHocPhan=@NewMaLopHocPhan,
+            MaCB=@NewMaCB,
+            MaNganh=@NewMaNganh,
+            MaMon=@NewMaMon,
+            SoTiet=@NewSoTiet,
+            SoTuan=@NewSoTuan,
+            HocKy=@NewHocKy,
+            NamHoc=@NewNamHoc
+        WHERE MaLopHocPhan=@OldMaLopHocPhan AND MaCB=@OldMaCB
+              AND HocKy=@OldHocKy AND NamHoc=@OldNamHoc;
+END
 GO
 
 
--- Xóa phân công
-CREATE OR ALTER PROCEDURE HasP_DeletePhanCong
-    @MaCB NVARCHAR(20),
-    @MaMon NVARCHAR(20),
+CREATE OR ALTER PROCEDURE dbo.HasP_DeletePhanCong
     @MaLopHocPhan NVARCHAR(20),
+    @MaCB NVARCHAR(20),
     @HocKy INT,
-    @NamHoc NVARCHAR(9)
+    @NamHoc NVARCHAR(20)
 AS
 BEGIN
-    DELETE FROM PhanCongGiangDay
-    WHERE MaCB=@MaCB AND MaMon=@MaMon AND MaLopHocPhan=@MaLopHocPhan
-          AND HocKy=@HocKy AND NamHoc=@NamHoc;
-END;
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    SELECT TOP(1) @role=RoleName, @mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
+
+    SELECT @target=cb.MaKhoa
+    FROM dbo.CanBo cb
+    WHERE cb.MaCB=@MaCB;
+
+    IF @target IS NULL
+        RAISERROR(N'Giảng viên không tồn tại.',16,1);
+    ELSE IF @role<>N'Admin' AND @target<>@mk
+        RAISERROR(N'Không xóa phân công ngoài khoa.',16,1);
+    ELSE
+        DELETE FROM dbo.PhanCongGiangDay
+        WHERE MaLopHocPhan=@MaLopHocPhan AND MaCB=@MaCB
+              AND HocKy=@HocKy AND NamHoc=@NamHoc;
+END
 GO
 
 -- Danh sách phân công theo khoa
@@ -761,49 +1065,27 @@ END;
 go
 
 
+-- thông tin cá nhân
+CREATE OR ALTER PROCEDURE dbo.Re_UpdateHoSoCaNhan
+    @Email NVARCHAR(150)=NULL, @Phone NVARCHAR(20)=NULL
+AS
+BEGIN
+    DECLARE @uid INT;
+    SELECT TOP(1) @uid=u.UserId
+    FROM dbo.TaiKhoan t JOIN dbo.Users u ON t.UserId=u.UserId
+    WHERE t.Username=USER_NAME();
 
--------------------------------------------------------------
+    IF @uid IS NULL
+        RAISERROR(N'Không xác định được tài khoản.',16,1);
+    ELSE
+        UPDATE dbo.Users SET Email=COALESCE(@Email,Email), Phone=COALESCE(@Phone,Phone) WHERE UserId=@uid;
+END
+GO
+
+
 -------------------------------------------------------------
 -----------------------LƯƠNG---------------------------------
 -------------------------------------------------------------
--------------------------------------------------------------
--- SP + TRANSACTION
--- Tính lương theo tiết
-CREATE OR ALTER PROCEDURE Re_TinhLuongGiangVien
-    @MaCB NVARCHAR(20),
-    @ThangNam CHAR(7),
-    @DonGiaTiet DECIMAL(18,2),  -- ví dụ: 200,000 / tiết
-    @HeSoId INT = NULL,
-    @PhuCap DECIMAL(18,2) = 0,
-    @KhauTru DECIMAL(18,2) = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRY
-        BEGIN TRAN;
-
-        -- Lấy tổng số tiết giảng dạy trong kỳ này
-        DECLARE @SoTiet INT = (
-            SELECT SUM(SoTiet * SoTuan)
-            FROM PhanCongGiangDay
-            WHERE MaCB=@MaCB AND FORMAT(GETDATE(),'yyyy') + '-' + FORMAT(GETDATE(),'MM') = @ThangNam
-        );
-
-        IF @SoTiet IS NULL SET @SoTiet = 0;
-
-        DECLARE @LuongCoBan DECIMAL(18,2) = @SoTiet * @DonGiaTiet;
-
-        -- Thêm bản ghi bảng lương
-        INSERT INTO BangLuong(MaCB, ThangNam, LuongCoBan, HeSoId, TongPhuCap, KhauTru)
-        VALUES(@MaCB, @ThangNam, @LuongCoBan, @HeSoId, @PhuCap, @KhauTru);
-
-        COMMIT TRAN;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRAN;
-        THROW;
-    END CATCH
-END;
 
 
 
@@ -997,7 +1279,105 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE Re_TinhLuongCanBo
+    @MaCB NVARCHAR(20),
+    @Thang INT,
+    @Nam INT,
+    @DonGiaTiet DECIMAL(18,2) = NULL,  -- nếu muốn tính theo tiết
+    @Thuong DECIMAL(18,2) = 0,
+    @KhauTru DECIMAL(18,2) = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        BEGIN TRAN;
 
+        -- Kiểm tra đã có bảng lương tháng/năm này chưa
+        IF EXISTS (SELECT 1 FROM BangLuong WHERE MaCB=@MaCB AND Thang=@Thang AND Nam=@Nam)
+        BEGIN
+            RAISERROR(N'Đã có bảng lương cho cán bộ này trong tháng/năm', 16, 1);
+            ROLLBACK TRAN;
+            RETURN;
+        END;
+
+        DECLARE @LuongCoSo DECIMAL(18,2) = (SELECT TOP 1 MucLuongCoSo FROM CauHinhLuong);
+        DECLARE @HeSo DECIMAL(4,2) = (
+            SELECT HeSoLuong FROM BacLuong b
+            JOIN CanBo c ON b.MaBacLuong = c.MaBacLuong
+            WHERE c.MaCB=@MaCB
+        );
+        DECLARE @PhuCap DECIMAL(18,2) = (SELECT ISNULL(PhuCap,0) FROM CanBo WHERE MaCB=@MaCB);
+
+        IF @LuongCoSo IS NULL SET @LuongCoSo = 0;
+        IF @HeSo IS NULL SET @HeSo = 1;
+
+        -- Nếu có tính thêm theo tiết dạy
+        DECLARE @LuongTiet DECIMAL(18,2) = 0;
+        IF @DonGiaTiet IS NOT NULL
+        BEGIN
+            SELECT @LuongTiet = SUM(SoTiet * SoTuan * @DonGiaTiet)
+            FROM PhanCongGiangDay
+            WHERE MaCB=@MaCB AND YEAR(GETDATE())=@Nam AND MONTH(GETDATE())=@Thang;
+            IF @LuongTiet IS NULL SET @LuongTiet = 0;
+        END
+
+        -- Tổng lương cơ bản theo bậc + phụ cấp + thưởng - khấu trừ
+        DECLARE @TongLuong DECIMAL(18,2) =
+            (@LuongCoSo * @HeSo) + @PhuCap + @Thuong + @LuongTiet - @KhauTru;
+
+        INSERT INTO BangLuong(MaCB, Thang, Nam, Thuong, KhauTru)
+        VALUES(@MaCB, @Thang, @Nam, @Thuong, @KhauTru);
+
+        COMMIT TRAN;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRAN;
+        THROW;
+    END CATCH
+END;
+EXEC Re_TinhLuongCanBo '2003', 9, 2025, NULL, 500000, 200000;
+SELECT * FROM Vw_CanBo_Luong;
+EXEC HasP_UpdateBangLuong 2, 1000000, 300000;
+EXEC HasP_DeleteBangLuong 2;
+
+
+
+
+INSERT INTO CauHinhLuong VALUES (1800000);
+
+-- Thêm bậc lương
+INSERT INTO BacLuong VALUES ('BL01', 2.34), ('BL02', 3.50);
+
+-- Gán cho cán bộ
+UPDATE CanBo SET MaBacLuong='BL01', PhuCap=500000 WHERE MaCB='2003';
+
+-- Tính lương
+EXEC Re_TinhLuongCanBo '2003', 9, 2025, NULL, 1000000, 200000;
+
+-- Xem kết quả
+SELECT * FROM Vw_CanBo_Luong WHERE MaCB='2003';
+
+
+CREATE OR ALTER PROCEDURE HasP_UpdateBangLuong
+    @MaBangLuong INT,
+    @Thuong DECIMAL(18,2),
+    @KhauTru DECIMAL(18,2)
+AS
+BEGIN
+    UPDATE BangLuong
+    SET Thuong=@Thuong, KhauTru=@KhauTru
+    WHERE MaBangLuong=@MaBangLuong;
+END;
+GO
+
+-- Xóa bảng lương
+CREATE OR ALTER PROCEDURE HasP_DeleteBangLuong
+    @MaBangLuong INT
+AS
+BEGIN
+    DELETE FROM BangLuong WHERE MaBangLuong=@MaBangLuong;
+END;
+GO
 
 
 
@@ -1016,12 +1396,14 @@ GO
 
 -- 2. View: Lương giảng viên chi tiết
 CREATE OR ALTER VIEW Vw_CanBo_Luong AS
-SELECT cb.MaCB, cb.HoTen, bl.ThangNam, bl.LuongCoBan,
-       h.GiaTri AS HeSo, bl.TongPhuCap, bl.KhauTru, bl.TongLuong
+SELECT cb.MaCB, cb.HoTen, bl.Thang, bl.Nam,
+       bl.Thuong, bl.KhauTru, cb.PhuCap,
+       b.HeSoLuong, cfg.MucLuongCoSo,
+       (cfg.MucLuongCoSo * b.HeSoLuong + cb.PhuCap + bl.Thuong - bl.KhauTru) AS TongLuong
 FROM BangLuong bl
 JOIN CanBo cb ON bl.MaCB = cb.MaCB
-LEFT JOIN HeSoLuong h ON bl.HeSoId = h.HeSoId;
-GO
+LEFT JOIN BacLuong b ON cb.MaBacLuong = b.MaBacLuong
+CROSS JOIN CauHinhLuong cfg;
 
 -- 3. Ngành Khoa (Dùng)
 CREATE OR ALTER VIEW Vw_Nganh
@@ -1043,17 +1425,104 @@ END;
 
 
 -- 5. Phân công
-CREATE OR ALTER VIEW Vw_PhanCong_ChiTiet AS
-SELECT  pc.MaCB, cb.HoTen AS TenCB,
-        pc.MaMon, mh.TenMon,
-        pc.MaLopHocPhan, lhp.TenLopHocPhan,
-        pc.SoTiet, pc.SoTuan, pc.HocKy, pc.NamHoc
-FROM PhanCongGiangDay pc
-JOIN CanBo cb           ON pc.MaCB = cb.MaCB
-JOIN MonHoc mh          ON pc.MaMon = mh.MaMon
-JOIN LopHocPhan lhp     ON pc.MaLopHocPhan = lhp.MaLopHocPhan;
+CREATE OR ALTER VIEW dbo.Vw_CanBo_TrongKhoaCuaToi
+AS
+SELECT cb.MaCB,
+       cb.HoTen,
+       cb.MaKhoa,
+       cb.MaChucVu,
+       cb.MaTrinhDo,
+       cb.Email,
+       cb.Phone,
+       cb.NgaySinh,
+       cb.GioiTinh
+FROM dbo.CanBo cb
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
+  AND cb.MaKhoa = cp.MaKhoa;
+
+-- 6.
+CREATE OR ALTER VIEW dbo.Vw_MonHoc_TrongKhoaCuaToi
+AS
+SELECT mh.MaMon,
+       mh.TenMon,
+       mh.MaKhoaPhuTrach
+FROM dbo.MonHoc mh
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
+  AND mh.MaKhoaPhuTrach = cp.MaKhoa;
 GO
 
+--7.
+CREATE OR ALTER VIEW dbo.Vw_LopHP_TrongKhoaCuaToi
+AS
+SELECT lhp.MaLopHocPhan,
+       lhp.MaMon,
+       lhp.TenLopHocPhan,
+       lhp.SoLuongSV,
+       mh.MaKhoaPhuTrach
+FROM dbo.LopHocPhan lhp
+JOIN dbo.MonHoc mh ON lhp.MaMon = mh.MaMon
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
+  AND mh.MaKhoaPhuTrach = cp.MaKhoa;
+GO
+
+
+-- 8. 
+CREATE OR ALTER VIEW dbo.Vw_LopHP_CuaToi
+AS
+SELECT pc.MaLopHocPhan, lhp.TenLopHocPhan, pc.MaCB
+FROM dbo.PhanCongGiangDay pc
+JOIN dbo.LopHocPhan lhp ON pc.MaLopHocPhan=lhp.MaLopHocPhan
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE pc.MaCB = cp.MaCB;
+GO
+
+-- 9.
+CREATE OR ALTER VIEW dbo.Vw_PhanCong_CuaToi
+AS
+SELECT pc.MaLopHocPhan, pc.MaCB, lhp.TenLopHocPhan
+FROM dbo.PhanCongGiangDay pc
+JOIN dbo.LopHocPhan lhp ON pc.MaLopHocPhan=lhp.MaLopHocPhan
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE pc.MaCB=cp.MaCB;
+GO
+
+
+-- 10.
+CREATE OR ALTER VIEW dbo.Vw_Nganh_TrongKhoaCuaToi
+AS
+SELECT ng.MaNganh,
+       ng.TenNganh,
+       ng.MaKhoa
+FROM dbo.Nganh ng
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
+  AND ng.MaKhoa = cp.MaKhoa;
+GO
+
+-- 11. 
+CREATE OR ALTER VIEW dbo.Vw_Khoa_CuaToi
+AS
+SELECT DISTINCT k.MaKhoa, k.TenKhoa
+FROM dbo.Khoa k
+JOIN dbo.CanBo cb ON cb.MaKhoa = k.MaKhoa
+CROSS JOIN dbo.RTO_CurrentPrincipal() cp
+WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
+  AND cb.MaCB = cp.MaCB;
+GO
+
+-- 12. 
+CREATE OR ALTER VIEW Vw_PhanCong_ByKhoa
+AS
+SELECT pc.MaLopHocPhan, pc.MaCB, gv.HoTen,
+       lhp.MaMon, mh.TenMon, mh.MaNganh,   -- thêm MaNganh
+       pc.HocKy, pc.NamHoc, pc.SoTiet, pc.SoTuan
+FROM PhanCongGiangDay pc
+JOIN LopHocPhan lhp ON pc.MaLopHocPhan = lhp.MaLopHocPhan
+JOIN MonHoc mh ON lhp.MaMon = mh.MaMon
+JOIN CanBo gv ON pc.MaCB = gv.MaCB;
 
 
 /*=========================

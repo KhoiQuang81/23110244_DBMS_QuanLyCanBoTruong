@@ -30,6 +30,8 @@ CREATE TABLE Users (
 );
 GO
 
+
+
 CREATE TABLE TaiKhoan (
   AccountId INT IDENTITY PRIMARY KEY,
   UserId INT NOT NULL UNIQUE,
@@ -106,6 +108,32 @@ CREATE TABLE CanBo (
   CONSTRAINT FK_CanBo_TrinhDo FOREIGN KEY (MaTrinhDo) REFERENCES TrinhDo(MaTrinhDo) ON DELETE SET NULL ON UPDATE CASCADE
 );
 GO
+IF COL_LENGTH('dbo.CanBo','UserId') IS NULL
+BEGIN
+    ALTER TABLE dbo.CanBo ADD UserId INT NULL; 
+END
+GO
+
+-- đảm bảo mỗi User chỉ gắn cho 1 cán bộ duy nhất
+IF NOT EXISTS (SELECT 1 FROM sys.indexes 
+               WHERE name = 'UX_CanBo_UserId' AND object_id = OBJECT_ID('dbo.CanBo'))
+BEGIN
+    CREATE UNIQUE INDEX UX_CanBo_UserId
+    ON dbo.CanBo(UserId)
+    WHERE UserId IS NOT NULL; -- cho phép nhiều NULL nhưng không cho trùng UserId
+END
+GO
+
+-- liên kết với Users
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_CanBo_Users')
+BEGIN
+    ALTER TABLE dbo.CanBo
+    ADD CONSTRAINT FK_CanBo_Users
+        FOREIGN KEY(UserId) REFERENCES dbo.Users(UserId)
+        ON DELETE SET NULL ON UPDATE CASCADE;
+END
+GO
+
 
 ALTER TABLE CanBo
 ADD MaBacLuong NVARCHAR(20) FOREIGN KEY REFERENCES BacLuong(MaBacLuong),
@@ -211,5 +239,3 @@ CREATE TABLE BangLuong (
 CREATE TABLE CauHinhLuong (
     MucLuongCoSo DECIMAL(18,2)
 );
-
-

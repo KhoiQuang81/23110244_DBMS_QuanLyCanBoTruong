@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DataLayer;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -45,44 +46,45 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void btn_DangNhap_Click(object sender, EventArgs e)
         {
-            //string username = txt_TenDangNhap.Text.Trim();
-            //string password = txt_MatKhau.Text.Trim();
+            string username = txt_TenDangNhap.Text.Trim();
+            string password = txt_MatKhau.Text.Trim();
 
-            //// Connection string động, dùng chính SQL Login
-            //string connStr = $"Server=.;Database=QLCanBoGiangVien;User Id={username};Password={password};";
+            // KẾT NỐI THEO SQL LOGIN
+            // Kết nối SQL bằng login đã tạo trong trigger
+            string connStr = $"Server=.;Database=QLCanBoGiangVien;User Id={username};Password={password};Encrypt=True;TrustServerCertificate=True;";
 
-            //try
-            //{
-            //    using (SqlConnection conn = new SqlConnection(connStr))
-            //    {
-            //        conn.Open(); // Nếu login sai hoặc không có quyền → Exception
-            //        MessageBox.Show("Đăng nhập thành công!");
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connStr))
+                {
+                    conn.Open(); // Sai quyền/sai mật khẩu -> Exception
+                }
 
-            //        // Truyền connStr qua FormMain để các form khác dùng
-            //        frm_QuanLyCanBo main = new frm_QuanLyCanBo(connStr, username);
-            //        main.Show();
-            //        this.Hide();
-            //    }
-            //}
-            //catch (Exception ex)
-            //{
-            //    MessageBox.Show("Đăng nhập thất bại: " + ex.Message);
-            //}
-            //MessageBox.Show("Đăng nhập thành công!");
-            //frm_QuanLyCanBo main = new frm_QuanLyCanBo();
-            //main.Show();
-            //this.Hide();
 
-            // ví dụ dựng tạm connStr: tích hợp Windows (test nhanh)
-            string connStr = "Server=.;Database=QLCanBoGiangVien;Integrated Security=True";
+                // Lấy thông tin role hiện tại bằng view/hàm RTO_CurrentPrincipal
+                DataAccess.SetConnection(username, password);
+                DataAccess db = new DataAccess(connStr);
+                DataTable dt = db.ExecuteQueryText("SELECT RoleName, MaCB FROM dbo.RTO_CurrentPrincipal()");
 
-            // hoặc nếu dùng SQL Login:
-            // string connStr = $"Server=.;Database=QLCanBoGiangVien;User Id={txtUser.Text};Password={txtPass.Text};";
+                string role = dt.Rows[0]["RoleName"].ToString();
+                string maCB = dt.Rows[0]["MaCB"].ToString();
 
-            var main = new frm_QuanLyCanBo(connStr);
-            main.FormClosed += (s, args) => this.Close();  // đóng app khi form chính đóng
-            main.Show();
-            this.Hide();
+                // Mở form chính và truyền role + maCB
+                frm_QuanLyCanBo main = new frm_QuanLyCanBo(connStr, role, maCB);
+                main.FormClosed += (s, args) => this.Close();
+                main.Show();
+                this.Hide();
+
+
+                //var main = new frm_QuanLyCanBo(connStr);
+                //main.FormClosed += (s, args) => this.Close();
+                //main.Show();
+                //this.Hide();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Đăng nhập thất bại: " + ex.Message);
+            }
         }
     }
 }

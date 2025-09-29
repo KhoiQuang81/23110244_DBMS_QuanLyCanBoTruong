@@ -15,13 +15,17 @@ namespace DBMS_QuanLyCanBoGiangVien
     public partial class frm_QuanLyLopHocPhan : Form
     {
         private DataAccess db;
+        private string _role;
+        private string _maCB;
         private string _maCT;
         private string _maLopSelected;
 
-        public frm_QuanLyLopHocPhan(string connStr)
+        public frm_QuanLyLopHocPhan(string connStr, string role, string maCB)
         {
             InitializeComponent();
             db = new DataAccess(connStr);
+            _role = role;
+            _maCB = maCB;
         }
 
         private void cb_TimLopTheoMon_SelectedIndexChanged(object sender, EventArgs e)
@@ -63,24 +67,34 @@ namespace DBMS_QuanLyCanBoGiangVien
         {
             if (string.IsNullOrEmpty(maMon)) return;
 
-            DataTable dt = db.ExecuteQuery("HasP_GetLopHocPhanByMon",
-                new SqlParameter("@MaMon", maMon));
-            dgv_LopHocPhan.DataSource = dt;
+            DataTable dt;
+            if (_role == "Admin" || _role == "TruongKhoa")
+            {
+                dt = db.ExecuteQuery("HasP_GetLopHocPhanByMon",
+                    new SqlParameter("@MaMon", maMon));
+            }
+            else // Giảng viên
+            {
+                dt = db.ExecuteQueryText("SELECT * FROM Vw_LopHP_TrongKhoaCuaToi");
+            }
 
-            //// chỉnh header cho đẹp
-            //dgv_LopHocPhan.Columns["MaLopHocPhan"].HeaderText = "Mã Lớp HP";
-            //dgv_LopHocPhan.Columns["MaMon"].HeaderText = "Mã Môn";
-            //dgv_LopHocPhan.Columns["TenLopHocPhan"].HeaderText = "Tên Lớp HP";
-            //dgv_LopHocPhan.Columns["SoLuongSV"].HeaderText = "Số lượng SV";
+            dgv_LopHocPhan.DataSource = dt;
         }
 
         private void LoadKhoa()
         {
-            DataTable dt = db.ExecuteQuery("NonP_GetAllKhoa");
-            cb_TenKhoa.DataSource = dt;
+            DataTable dtKhoa;
+            if (_role == "Admin")
+                dtKhoa = db.ExecuteQuery("NonP_GetAllKhoa");
+            else
+                dtKhoa = db.ExecuteQueryText("SELECT MaKhoa, TenKhoa FROM Vw_Khoa_CuaToi");
+
+            cb_TenKhoa.DataSource = dtKhoa;
             cb_TenKhoa.DisplayMember = "TenKhoa";
             cb_TenKhoa.ValueMember = "MaKhoa";
-            cb_TenKhoa.SelectedIndex = -1;
+
+            if (dtKhoa.Rows.Count > 0)
+                cb_TenKhoa.SelectedIndex = 0;
         }
 
         private void cb_TenKhoa_SelectedIndexChanged(object sender, EventArgs e)
@@ -187,41 +201,81 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void btn_Them_Click(object sender, EventArgs e)
         {
-            db.ExecuteNonQuery("HasP_InsertLopHocPhan",
-                new SqlParameter("@MaMon", txt_MaMon.Text),
-                new SqlParameter("@SoThuTu", int.Parse(txt_MaSoLop.Text)),
-                new SqlParameter("@MaKhoa", cb_TenKhoa.SelectedValue),
-                new SqlParameter("@MaNganh", cb_TenNganh.SelectedValue),
-                new SqlParameter("@MaCT", _maCT),
-                new SqlParameter("@SoLuongSV", int.Parse(txt_SoLuongSV.Text)));
-            LoadLopHocPhanByMon(txt_MaMon.Text);
+            if (cb_TenMon.SelectedValue == null || !int.TryParse(txt_MaSoLop.Text, out var soThuTu) ||  !int.TryParse(txt_SoLuongSV.Text, out var soLuong))
+            {
+                MessageBox.Show("Vui lòng chọn môn và nhập Số thứ tự / Số lượng SV hợp lệ!");
+                return;
+            }
+
+            try
+            {
+                db.ExecuteNonQuery("HasP_InsertLopHocPhan",
+                    new SqlParameter("@MaMon", (string)cb_TenMon.SelectedValue),
+                    new SqlParameter("@SoThuTu", soThuTu),
+                    new SqlParameter("@SoLuongSV", soLuong)
+                );
+
+                LoadLopHocPhanByMon((string)cb_TenMon.SelectedValue);
+                txt_MaSoLop.Clear();
+                txt_SoLuongSV.Clear();
+            }
+            catch (SqlException ex)
+            {
+                MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
 
         }
 
         private void btn_Sua_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(_maLopSelected)) return;
+            if (string.IsNullOrEmpty(_maLopSelected) || string.IsNullOrEmpty(txt_MaSoLop.Text) || string.IsNullOrEmpty(txt_SoLuongSV.Text))
+            {
+                MessageBox.Show("Vui lòng chọn lớp học phần để sửa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-            db.ExecuteNonQuery("HasP_UpdateLopHocPhan",
-                new SqlParameter("@OldMaLopHocPhan", _maLopSelected),
-                new SqlParameter("@SoThuTu", int.Parse(txt_MaSoLop.Text)),
-                new SqlParameter("@SoLuongSV", int.Parse(txt_SoLuongSV.Text)));
-            LoadLopHocPhanByMon(txt_MaMon.Text);
+            try
+            {
+                db.ExecuteNonQuery("HasP_UpdateLopHocPhan",
+                    new SqlParameter("@OldMaLopHocPhan", _maLopSelected),
+                    new SqlParameter("@SoThuTu", int.Parse(txt_MaSoLop.Text)),
+                    new SqlParameter("@SoLuongSV", int.Parse(txt_SoLuongSV.Text))
+                );
+
+                LoadLopHocPhanByMon(txt_MaMon.Text);
+                txt_MaSoLop.Clear();
+                txt_SoLuongSV.Clear();
+                MessageBox.Show("Cập nhật lớp học phần thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi cập nhật lớp học phần: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btn_Xoa_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(_maLopSelected)) return;
+            if (string.IsNullOrEmpty(_maLopSelected))
+            {
+                MessageBox.Show("Vui lòng chọn lớp học phần để xóa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-            db.ExecuteNonQuery("HasP_DeleteLopHocPhan",
-                new SqlParameter("@MaLopHocPhan", _maLopSelected));
-            LoadLopHocPhanByMon(txt_MaMon.Text);
-            txt_MaMon.Clear();
-            txt_TenLopHocPhan.Clear();
-            txt_SoLuongSV.Clear();
-            txt_MaSoLop.Clear();
-            _maLopSelected = null;
-            cb_TenMon.SelectedIndex = -1;
+            try
+            {
+                db.ExecuteNonQuery("HasP_DeleteLopHocPhan",
+                    new SqlParameter("@MaLopHocPhan", _maLopSelected)
+                );
+
+                LoadLopHocPhanByMon(txt_MaMon.Text);
+                txt_MaSoLop.Clear();
+                txt_SoLuongSV.Clear();
+                MessageBox.Show("Xóa lớp học phần thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi xóa lớp học phần: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btn_LamMoi_Click(object sender, EventArgs e)
@@ -242,20 +296,69 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void dgv_LopHocPhan_CellClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex >= 0)
-            {
-                var row = dgv_LopHocPhan.Rows[e.RowIndex];
-                _maLopSelected = row.Cells["MaLopHocPhan"].Value.ToString();
-                //txt_MaMon.Text = row.Cells["MaMon"].Value.ToString();
-                txt_TenLopHocPhan.Text = row.Cells["TenLopHocPhan"].Value.ToString();
-                txt_SoLuongSV.Text = row.Cells["SoLuongSV"].Value.ToString();
-            }
+            if (e.RowIndex < 0) return;
+
+            var row = dgv_LopHocPhan.Rows[e.RowIndex];
+            _maLopSelected = row.Cells["MaLopHocPhan"].Value?.ToString();
+            txt_TenLopHocPhan.Text = row.Cells["TenLopHocPhan"].Value?.ToString();
+            txt_SoLuongSV.Text = row.Cells["SoLuongSV"].Value?.ToString();
+
+            // Gợi ý Số thứ tự từ mã lớp: MaMon-XYZ
+            var parts = _maLopSelected?.Split('-');
+            if (parts?.Length == 2 && int.TryParse(parts[1], out var stt))
+                txt_MaSoLop.Text = stt.ToString();
         }
 
         private void frm_QuanLyLopHocPhan_Load(object sender, EventArgs e)
         {
             LoadKhoa();
             dgv_LopHocPhan.AutoGenerateColumns = false;
+
+            if (_role == "GiangVien")
+            {
+                // Giảng viên chỉ được xem
+                btn_Them.Enabled = false;
+                btn_Sua.Enabled = false;
+                btn_Xoa.Enabled = false;
+
+                cb_TenKhoa.Enabled = false;  // chỉ 1 khoa của giảng viên
+
+                // Tự load ngành luôn vì chỉ có 1 khoa
+                if (cb_TenKhoa.Items.Count > 0)
+                {
+                    string maKhoa = cb_TenKhoa.SelectedValue?.ToString();
+                    if (!string.IsNullOrEmpty(maKhoa))
+                    {
+                        DataTable dt = db.ExecuteQuery("HasP_GetNganhByKhoa",
+                            new SqlParameter("@MaKhoa", maKhoa));
+
+                        cb_TenNganh.DataSource = dt;
+                        cb_TenNganh.DisplayMember = "TenNganh";
+                        cb_TenNganh.ValueMember = "MaNganh";
+                        if (dt.Rows.Count > 0) cb_TenNganh.SelectedIndex = 0;
+                    }
+                }
+            }
+            else if (_role == "TruongKhoa")
+            {
+                cb_TenKhoa.Enabled = false; // trưởng khoa cũng chỉ 1 khoa
+
+                // Tự load ngành luôn vì chỉ có 1 khoa
+                if (cb_TenKhoa.Items.Count > 0)
+                {
+                    string maKhoa = cb_TenKhoa.SelectedValue?.ToString();
+                    if (!string.IsNullOrEmpty(maKhoa))
+                    {
+                        DataTable dt = db.ExecuteQuery("HasP_GetNganhByKhoa",
+                            new SqlParameter("@MaKhoa", maKhoa));
+
+                        cb_TenNganh.DataSource = dt;
+                        cb_TenNganh.DisplayMember = "TenNganh";
+                        cb_TenNganh.ValueMember = "MaNganh";
+                        if (dt.Rows.Count > 0) cb_TenNganh.SelectedIndex = 0;
+                    }
+                }
+            }
         }
     }
 }

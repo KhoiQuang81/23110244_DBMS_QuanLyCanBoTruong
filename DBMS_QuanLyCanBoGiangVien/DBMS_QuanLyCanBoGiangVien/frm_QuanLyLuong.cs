@@ -19,7 +19,7 @@ namespace DBMS_QuanLyCanBoGiangVien
         private string _role;
 
 
-        public frm_QuanLyLuong(string connStr, string maCB, string role)
+        public frm_QuanLyLuong(string connStr, string role, string maCB)
         {
             InitializeComponent();
             db = new DataAccess(connStr);
@@ -29,18 +29,25 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void frm_QuanLyLuong_Load(object sender, EventArgs e)
         {
+            cb_Thang.Items.AddRange(Enumerable.Range(1, 12).Cast<object>().ToArray());
+            cb_Nam.Items.AddRange(Enumerable.Range(2023, 10).Cast<object>().ToArray());
+
             if (_role == "Admin")
             {
                 LoadLuong(); // load tất cả
-                gb_ThongTin.Enabled = true; // nhóm nhập liệu được bật
+                gb_ThongTin.Enabled = true; // nhóm nhập liệu bật
+                btn_TinhLuong.Enabled = true;
+                btn_Sua.Enabled = true;
+                btn_Xoa.Enabled = true;
             }
-            else
+            else // Trưởng khoa, Giảng viên
             {
-                LoadLuongByCanBo(_maCB); // load chỉ lương của giảng viên
-                gb_ThongTin.Enabled = false; // ẩn hoặc disable nhập liệu
+                LoadLuongByCanBo(_maCB); // load chỉ lương của cán bộ đăng nhập
+                gb_ThongTin.Enabled = false;
+                btn_TinhLuong.Enabled = false;
+                btn_Sua.Enabled = false;
+                btn_Xoa.Enabled = false;
             }
-            cb_Thang.Items.AddRange(Enumerable.Range(1, 12).Cast<object>().ToArray());
-            cb_Nam.Items.AddRange(Enumerable.Range(2023, 10).Cast<object>().ToArray());
         }
 
         private void LoadLuong()
@@ -77,11 +84,6 @@ namespace DBMS_QuanLyCanBoGiangVien
             {
                 MessageBox.Show("Lỗi: " + ex.Message);
             }
-        }
-
-        private void dgv_BangLuong_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        {
-
         }
 
         private void btn_TinhLuong_Click(object sender, EventArgs e)
@@ -135,16 +137,16 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void btn_LamMoi_Click(object sender, EventArgs e)
         {
-            if (_role == "Admin")
-                LoadLuong();
-            else
-                LoadLuongByCanBo(_maCB);
+            //if (_role == "Admin")
+            //    LoadLuong();
+            //else
+            //    LoadLuongByCanBo(_maCB);
 
-            txt_Thuong.Clear();
-            txt_KhauTru.Clear();
-            cb_CanBo.SelectedIndex = -1;
-            cb_Thang.SelectedIndex = -1;
-            cb_Nam.SelectedIndex = -1;
+            //txt_Thuong.Clear();
+            //txt_KhauTru.Clear();
+            //cb_CanBo.SelectedIndex = -1;
+            //cb_Thang.SelectedIndex = -1;
+            //cb_Nam.SelectedIndex = -1;
         }
 
         private void dgv_BangLuong_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -185,6 +187,16 @@ namespace DBMS_QuanLyCanBoGiangVien
             {
                 MessageBox.Show("Lỗi: " + ex.Message);
             }
+        }
+
+        private void txt_Thuong_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void txt_KhauTru_TextChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

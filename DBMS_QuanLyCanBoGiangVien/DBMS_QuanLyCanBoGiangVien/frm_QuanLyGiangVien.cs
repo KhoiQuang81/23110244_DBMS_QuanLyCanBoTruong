@@ -15,11 +15,15 @@ namespace DBMS_QuanLyCanBoGiangVien
     public partial class frm_QuanLyGiangVien : Form
     {
         private DataAccess db;
+        private string _role;
+        private string _maCB;
 
-        public frm_QuanLyGiangVien(string connStr)
+        public frm_QuanLyGiangVien(string connStr, string role, string maCB)
         {
             InitializeComponent();
             db = new DataAccess(connStr);
+            _role = role;
+            _maCB = maCB;
         }
 
         private void frm_QuanLyGiangVien_Load(object sender, EventArgs e)
@@ -29,12 +33,72 @@ namespace DBMS_QuanLyCanBoGiangVien
             cb_GioiTinh.Items.Add("F");
             cb_GioiTinh.SelectedIndex = -1;
             LoadGiangVien();
+
+            // phân quyền nút theo role
+            if (_role == "GiangVien")
+            {
+                btn_Them.Enabled = false;
+                btn_Sua.Enabled = false;
+                btn_Xoa.Enabled = false;
+
+                txt_Email.ReadOnly = true;
+                txt_Phone.ReadOnly = true;
+                txt_MaKhoa.ReadOnly = true;
+                txt_MaChucVu.ReadOnly = true;
+                txt_MaTrinhDo.ReadOnly = true;
+                txt_MaCB.ReadOnly = true;
+                txt_HoTen.ReadOnly = true;
+                dt_NgaySinh.Enabled = false;
+                cb_GioiTinh.Enabled = false;
+
+            }
+
+            // hiện mã khoa cho Trưởng khoa hoặc Giảng viên
+            if (_role == "TruongKhoa" || _role == "GiangVien")
+            {
+                DataTable dt = db.ExecuteQueryText("SELECT MaKhoa FROM dbo.RTO_CurrentPrincipal()");
+                if (dt.Rows.Count > 0)
+                {
+                    txt_MaKhoa.Text = dt.Rows[0]["MaKhoa"].ToString();
+                    txt_MaKhoa.ReadOnly = true;
+                }
+            }
         }
 
         private void LoadGiangVien()
         {
-            DataTable dt = db.ExecuteQuery("NonP_GetAllCanBo");
+            //DataTable dt = db.ExecuteQuery("NonP_GetAllCanBo");
+            //dgv_GiangVien.DataSource = dt;
+
+            DataTable dt;
+
+            if (_role == "Admin")
+            {
+                dt = db.ExecuteQuery("NonP_GetAllCanBo");
+            }
+            else if (_role == "TruongKhoa")
+            {
+                // xem giảng viên trong khoa mình
+                dt = db.ExecuteQuery("HasP_GetGiangVienByKhoa_GV",
+                    new SqlParameter("@MaKhoa", LayMaKhoaTheoCanBo(_maCB)));
+            }
+            else // Giảng viên
+            {
+                // giảng viên chỉ xem giảng viên cùng khoa
+                dt = db.ExecuteQueryText("SELECT * FROM Vw_CanBo_TrongKhoaCuaToi");
+            }
+
             dgv_GiangVien.DataSource = dt;
+        }
+
+        private string LayMaKhoaTheoCanBo(string maCB)
+        {
+            //DataTable dt = db.ExecuteQueryText("SELECT MaKhoa FROM CanBo WHERE MaCB=@MaCB",
+            //    new SqlParameter("@MaCB", maCB));
+            DataTable dt = db.ExecuteQueryText("SELECT MaKhoa FROM dbo.RTO_CurrentPrincipal()");
+            if (dt.Rows.Count > 0)
+                return dt.Rows[0]["MaKhoa"].ToString();
+            return null;
         }
 
 
