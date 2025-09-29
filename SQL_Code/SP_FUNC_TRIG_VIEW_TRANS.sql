@@ -247,42 +247,6 @@ GRANT EXECUTE ON dbo.Re_UpdateHoSoCaNhan			TO r_GiangVien;
   =========================*/
 
 
-  -- 1. Thêm bảng lương cho 1 cán bộ trong tháng
-CREATE OR ALTER PROCEDURE Re_InsertBangLuong
-    @MaCB NVARCHAR(20),
-    @ThangNam CHAR(7),
-    @LuongCoBan DECIMAL(18,2),
-    @HeSoId INT = NULL,
-    @TongPhuCap DECIMAL(18,2) = 0,
-    @KhauTru DECIMAL(18,2) = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRY
-        BEGIN TRAN;
-        IF EXISTS (SELECT 1 FROM BangLuong WHERE MaCB=@MaCB AND ThangNam=@ThangNam)
-        BEGIN
-            RAISERROR(N'Bảng lương tháng này đã tồn tại cho cán bộ', 16, 1);
-            ROLLBACK TRAN;
-            RETURN;
-        END
-        INSERT INTO BangLuong(MaCB, ThangNam, LuongCoBan, HeSoId, TongPhuCap, KhauTru)
-        VALUES(@MaCB, @ThangNam, @LuongCoBan, @HeSoId, @TongPhuCap, @KhauTru);
-        COMMIT TRAN;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRAN;
-        THROW;
-    END CATCH
-END;
-GO
-
-EXEC Re_InsertBangLuong '1980', '2025-09', 6000000, 2, 500000, 200000;
--- chạy lại cùng tháng để test RAISERROR
-EXEC Re_InsertBangLuong '1980', '2025-09', 6000000, 2, 500000, 200000;
-
-
-
 -------------------------------------------------------------
 -- CRUD: CanBo
 -------------------------------------------------------------
@@ -420,13 +384,6 @@ BEGIN
 END
 GO
 
-EXEC HasP_InsertCanBo '2020', N'Vũ Đình Bảo', '1993-05-20', 'M', 'baovd@hcmute.edu.vn', '0909999999', '05', 'GV', 'ThS', NULL;
-EXEC HasP_UpdateCanBo '2020', N'Vũ Đình Bảo', '1993-05-20', 'M', 'baovd@hcmute.edu.vn', '0909999999', '05', 'GV', 'TS';
-EXEC HasP_GetCanBoById '2020';
-EXEC NonP_GetAllCanBo;
-EXEC HasP_DeleteCanBo '2020';
-
-
 
 -------------------------------------------------------------
 -- CRUD: MonHoc
@@ -476,7 +433,6 @@ BEGIN
 END
 GO
 
-
 -- UPDATE môn học đầy đủ
 CREATE OR ALTER PROCEDURE dbo.HasP_UpdateMonHoc
     @MaMon NVARCHAR(20),
@@ -512,8 +468,6 @@ BEGIN
 END
 GO
 
-
-
 -- DELETE môn học
 CREATE OR ALTER PROCEDURE dbo.HasP_DeleteMonHoc
     @MaMon NVARCHAR(20),
@@ -538,7 +492,6 @@ BEGIN
 END
 GO
 
-
 CREATE OR ALTER PROCEDURE HasP_GetNganhByKhoa
     @MaKhoa NVARCHAR(20)
 AS
@@ -554,7 +507,7 @@ BEGIN
     SELECT TOP 1 MaCT, TenCT FROM ChuongTrinh WHERE MaNganh = @MaNganh;
 END;
 
--- 
+
 CREATE OR ALTER PROCEDURE HasP_GetMonHocByCT
     @MaCT NVARCHAR(20)
 AS
@@ -581,7 +534,6 @@ END;
 -------------------------------------------------------------
 -- CRUD: LopHocPhan
 -------------------------------------------------------------
-
 --------------------------------------------------------
 -- Thêm lớp học phần
 --------------------------------------------------------
@@ -698,65 +650,6 @@ END
 GO
 
 
-
-
---------------------------------------------------------
--- Sửa lớp học phần (chỉ số thứ tự và số lượng SV)
---------------------------------------------------------
-CREATE OR ALTER PROCEDURE HasP_UpdateLopHocPhan
-    @OldMaLopHocPhan NVARCHAR(30),
-    @SoThuTu INT,
-    @SoLuongSV INT
-AS
-BEGIN
-    DECLARE @MaMon NVARCHAR(20), @NewMaLopHocPhan NVARCHAR(30);
-
-    -- Lấy lại mã môn từ lớp học phần cũ
-    SELECT @MaMon = MaMon FROM LopHocPhan WHERE MaLopHocPhan = @OldMaLopHocPhan;
-
-    IF @MaMon IS NULL
-    BEGIN
-        RAISERROR(N'Lớp học phần không tồn tại', 16, 1);
-        RETURN;
-    END
-
-    -- Tạo mã lớp học phần mới dựa trên số thứ tự mới
-    SET @NewMaLopHocPhan = @MaMon + '_' + RIGHT('00' + CAST(@SoThuTu AS NVARCHAR(2)), 2);
-
-    UPDATE LopHocPhan
-    SET MaLopHocPhan = @NewMaLopHocPhan,
-        SoLuongSV = @SoLuongSV
-    WHERE MaLopHocPhan = @OldMaLopHocPhan;
-END;
-GO
-
-
---------------------------------------------------------
--- Xoá lớp học phần
---------------------------------------------------------
-CREATE OR ALTER PROCEDURE HasP_DeleteLopHocPhan
-    @MaLopHocPhan NVARCHAR(30)
-AS
-BEGIN
-    DELETE FROM LopHocPhan WHERE MaLopHocPhan = @MaLopHocPhan;
-END;
-GO
-
-
---------------------------------------------------------
--- Lấy tất cả lớp học phần
---------------------------------------------------------
-CREATE OR ALTER PROCEDURE NonP_GetAllLopHocPhan
-AS
-BEGIN
-    SELECT LHP.MaLopHocPhan, LHP.TenLopHocPhan, LHP.MaMon, MH.TenMon,
-           LHP.MaKhoa, LHP.MaNganh, LHP.MaCT, LHP.SoLuongSV
-    FROM LopHocPhan LHP
-    JOIN MonHoc MH ON LHP.MaMon = MH.MaMon;
-END;
-GO
-
-
 --------------------------------------------------------
 -- Lấy lớp học phần theo môn học
 --------------------------------------------------------
@@ -768,18 +661,6 @@ BEGIN
            lhp.MaKhoa, lhp.MaNganh, lhp.MaCT, lhp.SoLuongSV
     FROM LopHocPhan lhp
     WHERE lhp.MaMon = @MaMon;
-END;
-GO
-
-
-CREATE OR ALTER PROCEDURE HasP_SearchLopHocPhan
-    @MaMon NVARCHAR(20)
-AS
-BEGIN
-    SELECT lhp.MaLopHocPhan, lhp.TenLopHocPhan, lhp.SoLuongSV, mh.TenMon
-    FROM LopHocPhan lhp
-	JOIN MonHoc mh ON lhp.MaMon = mh.MaMon
-    WHERE lhp.MaMon = @MaMon
 END;
 GO
 
@@ -815,39 +696,6 @@ CREATE OR ALTER PROCEDURE HasP_DeleteNganh -- dùng
 AS
 BEGIN
  DELETE FROM Nganh WHERE MaNganh=@MaNganh;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE NonP_GetAllNganh -- dùng
-AS
-BEGIN
- SELECT MaNganh, TenNganh FROM Nganh;
-END;
-GO
-
-
--- tìm ngành
-CREATE OR ALTER PROCEDURE HasP_GetNganhByKhoa
-    @MaKhoa NVARCHAR(20)
-AS
-BEGIN
-    SELECT MaNganh, TenNganh, MaKhoa
-    FROM Nganh
-    WHERE MaKhoa = @MaKhoa;
-END;
-
-
--------------------------------------------------------------
--- CRUD: Lớp học phần
--------------------------------------------------------------
--- Lấy tất cả lớp học phần theo ngành
-CREATE OR ALTER PROCEDURE HasP_GetLopHocPhanByNganh
-    @MaNganh NVARCHAR(20)
-AS
-BEGIN
-    SELECT MaLopHocPhan, TenLopHocPhan, MaKhoa, MaNganh, MaCT, SoLuongSV
-    FROM LopHocPhan
-    WHERE MaNganh = @MaNganh;
 END;
 GO
 
@@ -1057,30 +905,6 @@ END;
 go
 
 
--- thông tin cá nhân
-CREATE OR ALTER PROCEDURE dbo.Re_UpdateHoSoCaNhan
-    @Email NVARCHAR(150)=NULL, @Phone NVARCHAR(20)=NULL
-AS
-BEGIN
-    DECLARE @uid INT;
-    SELECT TOP(1) @uid=u.UserId
-    FROM dbo.TaiKhoan t JOIN dbo.Users u ON t.UserId=u.UserId
-    WHERE t.Username=USER_NAME();
-
-    IF @uid IS NULL
-        RAISERROR(N'Không xác định được tài khoản.',16,1);
-    ELSE
-        UPDATE dbo.Users SET Email=COALESCE(@Email,Email), Phone=COALESCE(@Phone,Phone) WHERE UserId=@uid;
-END
-GO
-
-
--------------------------------------------------------------
------------------------LƯƠNG---------------------------------
--------------------------------------------------------------
-
-
-
 
 
 /*=========================
@@ -1103,152 +927,6 @@ BEGIN
         RETURN 0;
 
     RETURN 1;
-END;
-GO
-
--- 2. check lớp chưa phân công
-CREATE OR ALTER FUNCTION RTO_LopHP_ChuaPhanCong
-(
-    @MaMon NVARCHAR(20),
-    @HocKy INT,
-    @NamHoc NVARCHAR(9)
-)
-RETURNS TABLE
-AS
-RETURN
-(
-    SELECT lhp.MaLopHocPhan, lhp.TenLopHocPhan
-    FROM LopHocPhan lhp
-    WHERE lhp.MaMon = @MaMon
-      AND NOT EXISTS (
-            SELECT 1 FROM PhanCongGiangDay pc
-            WHERE pc.MaLopHocPhan = lhp.MaLopHocPhan
-              AND pc.HocKy = @HocKy
-              AND pc.NamHoc = @NamHoc
-        )
-);
-GO
-
-CREATE OR ALTER FUNCTION RTM_PhanCong_ByKhoaNganh
-(
-    @MaKhoa NVARCHAR(20) = NULL,
-    @MaNganh NVARCHAR(20) = NULL,
-    @HocKy INT = NULL,
-    @NamHoc NVARCHAR(9) = NULL
-)
-RETURNS @T TABLE
-(
-    MaCB NVARCHAR(20), TenCB NVARCHAR(150),
-    MaMon NVARCHAR(20), TenMon NVARCHAR(200),
-    MaLopHocPhan NVARCHAR(20), TenLopHocPhan NVARCHAR(200),
-    SoTiet INT, SoTuan INT, HocKy INT, NamHoc NVARCHAR(20)
-)
-AS
-BEGIN
-    INSERT @T
-    SELECT pc.MaCB, cb.HoTen, pc.MaMon, mh.TenMon,
-           pc.MaLopHocPhan, lhp.TenLopHocPhan,
-           pc.SoTiet, pc.SoTuan, pc.HocKy, pc.NamHoc
-    FROM PhanCongGiangDay pc
-    JOIN CanBo cb    ON pc.MaCB = cb.MaCB
-    JOIN MonHoc mh   ON pc.MaMon = mh.MaMon
-    JOIN LopHocPhan lhp ON pc.MaLopHocPhan = lhp.MaLopHocPhan
-    WHERE (@MaKhoa IS NULL  OR lhp.MaKhoa = @MaKhoa)
-      AND (@MaNganh IS NULL OR lhp.MaNganh = @MaNganh)
-      AND (@HocKy IS NULL   OR pc.HocKy = @HocKy)
-      AND (@NamHoc IS NULL  OR pc.NamHoc = @NamHoc);
-    RETURN;
-END;
-GO
-
-
-
-/*=========================
-		 4. TRIGGER
-  =========================*/
-
-
-  -- 1. Trigger Xét kết quả
-CREATE OR ALTER TRIGGER trg_SVL_CalcDiem ON SinhVien_Lop
-AFTER INSERT, UPDATE
-AS
-BEGIN
-
-  UPDATE svl
-  SET 
-      DiemTrungBinh = ROUND(
-          ISNULL(svl.DiemQuaTrinh,0) * 0.5 + ISNULL(svl.DiemCuoiKy,0) * 0.5, 2),
-      TrangThai = CASE 
-                     WHEN I.DiemCuoiKy IS NULL OR I.DiemQuaTrinh IS NULL THEN NULL
-					 WHEN I.DiemCuoiKy < 3 OR (I.DiemQuaTrinh * 0.5 + I.DiemCuoiKy * 0.5) < 5 
-						THEN N'Không đạt'
-					 ELSE N'Đạt'
-                  END
-  FROM SinhVien_Lop svl
-  INNER JOIN inserted i 
-       ON svl.MaSV = i.MaSV AND svl.MaLopHocPhan = i.MaLopHocPhan;
-END;
-GO
-UPDATE SinhVien_Lop
-SET DiemQuaTrinh = 8, DiemCuoiKy = 9
-WHERE MaSV = '23110244' AND MaLopHocPhan = 'INPR140285_02';
-
-
-
--- 2. Trigger: cập nhật SoLuongSV trong LopHocPhan khi INSERT/DELETE
-CREATE OR ALTER TRIGGER trg_UpdateSoLuongSV
-ON SinhVien_Lop
-AFTER INSERT, DELETE
-AS
-BEGIN
-    UPDATE LHP
-    SET SoLuongSV = (SELECT COUNT(*) FROM SinhVien_Lop S WHERE S.MaLopHocPhan = LHP.MaLopHocPhan)
-    FROM LopHocPhan LHP
-    WHERE LHP.MaLopHocPhan IN (
-        SELECT MaLopHocPhan FROM inserted
-        UNION
-        SELECT MaLopHocPhan FROM deleted
-    );
-END;
-GO
-INSERT INTO SinhVien_Lop (MaSV, MaLopHocPhan) VALUES ('23110244', 'PRTE230385_25');
-SELECT SoLuongSV FROM LopHocPhan WHERE MaLopHocPhan='PRTE230385_25';
-
-DELETE FROM SinhVien_Lop WHERE MaSV='23110244' AND MaLopHocPhan='PRTE230385_25';
-SELECT SoLuongSV FROM LopHocPhan WHERE MaLopHocPhan='PRTE230385_25';
-
-
-
--- 3. Trigger: không cho nhập điểm ngoài thang điểm (0-10)
-CREATE OR ALTER TRIGGER trg_CheckDiem
-ON SinhVien_Lop
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    IF EXISTS (SELECT 1 FROM inserted WHERE DiemQuaTrinh < 0 OR DiemQuaTrinh > 10 OR DiemCuoiKy < 0 OR DiemCuoiKy > 10)
-    BEGIN
-        RAISERROR(N'Điểm phải nằm trong khoảng 0 đến 10', 16, 1);
-        ROLLBACK TRANSACTION;
-    END
-END;
-GO
-
-
--- 4. Trigger: ngăn không cho xóa môn học nếu đã có phân công
-CREATE OR ALTER TRIGGER trg_PreventDeleteMonHoc
-ON MonHoc
-INSTEAD OF DELETE
-AS
-BEGIN
-    IF EXISTS (SELECT 1 FROM PhanCongGiangDay pc JOIN deleted d ON pc.MaMon = d.MaMon)
-    BEGIN
-        RAISERROR(N'Không thể xóa môn học đã được phân công giảng dạy', 16, 1);
-        ROLLBACK TRANSACTION;
-    END
-    ELSE
-    BEGIN
-        DELETE FROM MonHoc WHERE MaMon IN (SELECT MaMon FROM deleted);
-    END
 END;
 GO
 
@@ -1346,21 +1024,19 @@ GO
 -- Kiểm tra lại
 SELECT * FROM BangLuong WHERE MaCB = '2003' AND Thang = 9 AND Nam = 2025;
 
-
+CREATE OR ALTER PROCEDURE NonP_GetAllKhoa
+AS
+BEGIN
+    SELECT MaKhoa, TenKhoa FROM Khoa;
+END;
 
 /*=========================
 		  5. VIEW
   =========================*/
   
-  -- 1. View: Bảng điểm SV theo lớp học phần
-CREATE OR ALTER VIEW Vw_SinhVien_Diem AS
-SELECT sv.MaSV, sv.HoTen, sv.MaLop, svl.MaLopHocPhan,
-       svl.DiemQuaTrinh, svl.DiemCuoiKy, svl.DiemTrungBinh, svl.TrangThai
-FROM SinhVien sv
-JOIN SinhVien_Lop svl ON sv.MaSV = svl.MaSV;
-GO
 
--- 2. View: Lương giảng viên chi tiết
+
+-- View: Lương giảng viên chi tiết
 CREATE OR ALTER VIEW Vw_CanBo_Luong
 AS
 SELECT 
@@ -1383,26 +1059,7 @@ SELECT * FROM Vw_CanBo_Luong;
 
 
 
--- 3. Ngành Khoa (Dùng)
-CREATE OR ALTER VIEW Vw_Nganh
-AS
-SELECT n.MaNganh, n.TenNganh, n.MaKhoa, k.TenKhoa
-FROM Nganh n
-JOIN Khoa k ON n.MaKhoa = k.MaKhoa;
 
-
-SELECT TOP 10 * FROM Vw_SinhVien_Diem;
-SELECT TOP 10 * FROM Vw_CanBo_Luong;
-
--- 4. Khoa
-CREATE OR ALTER PROCEDURE NonP_GetAllKhoa
-AS
-BEGIN
-    SELECT MaKhoa, TenKhoa FROM Khoa;
-END;
-
-
--- 5. Phân công
 CREATE OR ALTER VIEW dbo.Vw_CanBo_TrongKhoaCuaToi
 AS
 SELECT cb.MaCB,
@@ -1419,7 +1076,7 @@ CROSS JOIN dbo.RTO_CurrentPrincipal() cp
 WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
   AND cb.MaKhoa = cp.MaKhoa;
 
--- 6.
+
 CREATE OR ALTER VIEW dbo.Vw_MonHoc_TrongKhoaCuaToi
 AS
 SELECT mh.MaMon,
@@ -1431,7 +1088,7 @@ WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
   AND mh.MaKhoaPhuTrach = cp.MaKhoa;
 GO
 
---7.
+
 CREATE OR ALTER VIEW dbo.Vw_LopHP_TrongKhoaCuaToi
 AS
 SELECT lhp.MaLopHocPhan,
@@ -1447,17 +1104,7 @@ WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
 GO
 
 
--- 8. 
-CREATE OR ALTER VIEW dbo.Vw_LopHP_CuaToi
-AS
-SELECT pc.MaLopHocPhan, lhp.TenLopHocPhan, pc.MaCB
-FROM dbo.PhanCongGiangDay pc
-JOIN dbo.LopHocPhan lhp ON pc.MaLopHocPhan=lhp.MaLopHocPhan
-CROSS JOIN dbo.RTO_CurrentPrincipal() cp
-WHERE pc.MaCB = cp.MaCB;
-GO
 
--- 9.
 CREATE OR ALTER VIEW dbo.Vw_PhanCong_CuaToi
 AS
 SELECT 
@@ -1479,8 +1126,6 @@ WHERE pc.MaCB = cp.MaCB;
 GO
 
 
-
--- 10.
 CREATE OR ALTER VIEW dbo.Vw_Nganh_TrongKhoaCuaToi
 AS
 SELECT ng.MaNganh,
@@ -1492,7 +1137,7 @@ WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
   AND ng.MaKhoa = cp.MaKhoa;
 GO
 
--- 11. 
+ 
 CREATE OR ALTER VIEW dbo.Vw_Khoa_CuaToi
 AS
 SELECT DISTINCT k.MaKhoa, k.TenKhoa
