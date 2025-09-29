@@ -36,7 +36,7 @@ CREATE TABLE TaiKhoan (
   AccountId INT IDENTITY PRIMARY KEY,
   UserId INT NOT NULL UNIQUE,
   Username NVARCHAR(100) NOT NULL UNIQUE,
-  Password NVARCHAR(255) NOT NULL, -- plaintext (demo). KHÔNG DÙNG IN PRODUCTION
+  Password NVARCHAR(255) NOT NULL,
   IsLocked BIT NOT NULL DEFAULT 0,
   CONSTRAINT FK_TaiKhoan_Users FOREIGN KEY (UserId) REFERENCES Users(UserId) ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -57,10 +57,7 @@ CREATE TABLE Nganh (
   MaKhoa NVARCHAR(20) NOT NULL,
   CONSTRAINT FK_Nganh_Khoa FOREIGN KEY (MaKhoa) REFERENCES Khoa(MaKhoa) ON DELETE NO ACTION ON UPDATE CASCADE
 );
-
-Alter TABLE Nganh 
-  add CONSTRAINT FK_Nganh_Khoa FOREIGN KEY (MaKhoa) REFERENCES Khoa(MaKhoa) ON DELETE NO ACTION ON UPDATE CASCADE
-;
+GO
 
 CREATE TABLE ChuongTrinh (
   MaCT NVARCHAR(20) NOT NULL PRIMARY KEY,
@@ -93,11 +90,10 @@ GO
 --    dùng MaKhoa (tham chiếu Khoa.MaKhoa) và IsTruongKhoa để đảm bảo 1 trưởng khoa
 -------------------------------------------------------------
 CREATE TABLE CanBo (
-  CanBoId INT IDENTITY PRIMARY KEY,
   MaCB NVARCHAR(20) NOT NULL UNIQUE,
   HoTen NVARCHAR(150) NOT NULL,
   NgaySinh DATE NULL,
-  GioiTinh CHAR(1) NULL CHECK (GioiTinh IN ('M','F','O')),
+  GioiTinh CHAR(1) NULL CHECK (GioiTinh IN ('M','F')),
   Email NVARCHAR(150) NULL,
   Phone NVARCHAR(20) NULL,
   MaKhoa NVARCHAR(20) NULL,      -- tham chiếu Khoa.MaKhoa
@@ -207,10 +203,6 @@ CREATE TABLE PhanCongGiangDay (
 Go
 
 ALTER TABLE PhanCongGiangDay
-ADD MaNganh NVARCHAR(20) NOT NULL;
-GO
-
-ALTER TABLE PhanCongGiangDay
 ALTER COLUMN MaNganh NVARCHAR(20) NOT NULL;
 
 ALTER TABLE PhanCongGiangDay
@@ -227,13 +219,13 @@ CREATE TABLE BacLuong (
 );
 
 CREATE TABLE BangLuong (
-    MaBangLuong INT IDENTITY PRIMARY KEY,
     MaCB NVARCHAR(20) NOT NULL,
     Thang INT,
     Nam INT,
     Thuong DECIMAL(18,2) DEFAULT 0,
     KhauTru DECIMAL(18,2) DEFAULT 0,
-	CONSTRAINT FK_BangLuong_CanBo FOREIGN KEY (MaCB) REFERENCES CanBo(MaCB) ON DELETE CASCADE
+	CONSTRAINT FK_BangLuong_CanBo FOREIGN KEY (MaCB) REFERENCES CanBo(MaCB) ON DELETE CASCADE,
+	CONSTRAINT UQ_BangLuong UNIQUE (MaCB, Thang, Nam)
 );
 
 CREATE TABLE CauHinhLuong (

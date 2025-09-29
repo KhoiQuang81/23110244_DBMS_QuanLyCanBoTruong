@@ -32,23 +32,57 @@ namespace DBMS_QuanLyCanBoGiangVien
             cb_Thang.Items.AddRange(Enumerable.Range(1, 12).Cast<object>().ToArray());
             cb_Nam.Items.AddRange(Enumerable.Range(2023, 10).Cast<object>().ToArray());
 
+            LoadCanBo();
+
             if (_role == "Admin")
             {
-                LoadLuong(); // load tất cả
-                gb_ThongTin.Enabled = true; // nhóm nhập liệu bật
+                LoadLuong(); // SELECT từ Vw_CanBo_Luong
+                gb_ThongTin.Enabled = true;
                 btn_TinhLuong.Enabled = true;
                 btn_Sua.Enabled = true;
                 btn_Xoa.Enabled = true;
             }
-            else // Trưởng khoa, Giảng viên
+            else
             {
-                LoadLuongByCanBo(_maCB); // load chỉ lương của cán bộ đăng nhập
+                LoadLuongByCanBo(_maCB); // SELECT từ Vw_Luong_CuaToi
                 gb_ThongTin.Enabled = false;
                 btn_TinhLuong.Enabled = false;
                 btn_Sua.Enabled = false;
                 btn_Xoa.Enabled = false;
             }
         }
+
+
+        private void LoadCanBo()
+        {
+            DataTable dt;
+
+            if (_role == "Admin")
+            {
+                // Admin xem được tất cả cán bộ
+                dt = db.ExecuteQueryText("SELECT MaCB, HoTen FROM CanBo");
+            }
+            else
+            {
+                // Trưởng khoa, Giảng viên → chỉ load chính mình
+                dt = db.ExecuteQueryText("SELECT * FROM Vw_Luong_CuaToi",
+                    new SqlParameter("@MaCB", _maCB));
+            }
+
+            cb_CanBo.DataSource = dt;
+            cb_CanBo.DisplayMember = "HoTen";
+            cb_CanBo.ValueMember = "MaCB";
+
+            if (dt.Rows.Count > 0)
+                cb_CanBo.SelectedIndex = 0;
+        }
+
+
+        //private void LoadLuong()
+        //{
+        //    DataTable dt = db.ExecuteQueryText("SELECT * FROM Vw_CanBo_Luong");
+        //    dgv_BangLuong.DataSource = dt;
+        //}
 
         private void LoadLuong()
         {
@@ -58,8 +92,7 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void LoadLuongByCanBo(string maCB)
         {
-            DataTable dt = db.ExecuteQueryText("SELECT * FROM Vw_CanBo_Luong WHERE MaCB=@MaCB",
-                new SqlParameter("@MaCB", maCB));
+            DataTable dt = db.ExecuteQueryText("SELECT * FROM Vw_Luong_CuaToi");
             dgv_BangLuong.DataSource = dt;
         }
 
@@ -69,7 +102,7 @@ namespace DBMS_QuanLyCanBoGiangVien
             {
                 SqlParameter[] prms = new SqlParameter[]
                 {
-                    new SqlParameter("@MaCB", cb_CanBo.Text.Trim()),
+                    new SqlParameter("@MaCB", cb_CanBo.SelectedValue.ToString()),
                     new SqlParameter("@Thang", Convert.ToInt32(cb_Thang.SelectedItem)),
                     new SqlParameter("@Nam", Convert.ToInt32(cb_Nam.SelectedItem)),
                     new SqlParameter("@Thuong", string.IsNullOrWhiteSpace(txt_Thuong.Text) ? 0 : Convert.ToDecimal(txt_Thuong.Text)),
@@ -101,10 +134,15 @@ namespace DBMS_QuanLyCanBoGiangVien
                     return;
                 }
 
-                int maBangLuong = Convert.ToInt32(dgv_BangLuong.CurrentRow.Cells["MaBangLuong"].Value);
-                SqlParameter prm = new SqlParameter("@MaBangLuong", maBangLuong);
+                string maCB = dgv_BangLuong.CurrentRow.Cells["MaCB"].Value.ToString();
+                int thang = Convert.ToInt32(dgv_BangLuong.CurrentRow.Cells["Thang"].Value);
+                int nam = Convert.ToInt32(dgv_BangLuong.CurrentRow.Cells["Nam"].Value);
 
-                db.ExecuteNonQuery("HasP_DeleteBangLuong", prm);
+                db.ExecuteNonQuery("HasP_DeleteBangLuong",
+                    new SqlParameter("@MaCB", maCB),
+                    new SqlParameter("@Thang", thang),
+                    new SqlParameter("@Nam", nam));
+
                 MessageBox.Show("Xóa lương thành công!");
                 LoadLuong();
             }
@@ -137,24 +175,29 @@ namespace DBMS_QuanLyCanBoGiangVien
 
         private void btn_LamMoi_Click(object sender, EventArgs e)
         {
-            //if (_role == "Admin")
-            //    LoadLuong();
-            //else
-            //    LoadLuongByCanBo(_maCB);
+            if (_role == "Admin")
+                LoadLuong();
+            else
+                LoadLuongByCanBo(_maCB);
 
-            //txt_Thuong.Clear();
-            //txt_KhauTru.Clear();
-            //cb_CanBo.SelectedIndex = -1;
-            //cb_Thang.SelectedIndex = -1;
-            //cb_Nam.SelectedIndex = -1;
+            txt_Thuong.Clear();
+            txt_KhauTru.Clear();
+            cb_CanBo.SelectedIndex = -1;
+            cb_Thang.SelectedIndex = -1;
+            cb_Nam.SelectedIndex = -1;
         }
 
         private void dgv_BangLuong_CellClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0 && dgv_BangLuong.CurrentRow != null)
             {
-                txt_Thuong.Text = dgv_BangLuong.CurrentRow.Cells["Thuong"].Value.ToString();
-                txt_KhauTru.Text = dgv_BangLuong.CurrentRow.Cells["KhauTru"].Value.ToString();
+                DataGridViewRow row = dgv_BangLuong.CurrentRow;
+
+                cb_CanBo.SelectedValue = row.Cells["MaCB"].Value.ToString();
+                cb_Thang.SelectedItem = Convert.ToInt32(row.Cells["Thang"].Value);
+                cb_Nam.SelectedItem = Convert.ToInt32(row.Cells["Nam"].Value);
+                txt_Thuong.Text = row.Cells["Thuong"].Value.ToString();
+                txt_KhauTru.Text = row.Cells["KhauTru"].Value.ToString();
             }
         }
 
@@ -168,18 +211,20 @@ namespace DBMS_QuanLyCanBoGiangVien
                     return;
                 }
 
-                int maBangLuong = Convert.ToInt32(dgv_BangLuong.CurrentRow.Cells["MaBangLuong"].Value);
+                string maCB = dgv_BangLuong.CurrentRow.Cells["MaCB"].Value.ToString();
+                int thang = Convert.ToInt32(dgv_BangLuong.CurrentRow.Cells["Thang"].Value);
+                int nam = Convert.ToInt32(dgv_BangLuong.CurrentRow.Cells["Nam"].Value);
+
                 decimal thuong = string.IsNullOrWhiteSpace(txt_Thuong.Text) ? 0 : Convert.ToDecimal(txt_Thuong.Text);
                 decimal khauTru = string.IsNullOrWhiteSpace(txt_KhauTru.Text) ? 0 : Convert.ToDecimal(txt_KhauTru.Text);
 
-                SqlParameter[] prms = new SqlParameter[]
-                {
-                    new SqlParameter("@MaBangLuong", maBangLuong),
+                db.ExecuteNonQuery("HasP_UpdateBangLuong",
+                    new SqlParameter("@MaCB", maCB),
+                    new SqlParameter("@Thang", thang),
+                    new SqlParameter("@Nam", nam),
                     new SqlParameter("@Thuong", thuong),
-                    new SqlParameter("@KhauTru", khauTru)
-                };
+                    new SqlParameter("@KhauTru", khauTru));
 
-                db.ExecuteNonQuery("HasP_UpdateBangLuong", prms);
                 MessageBox.Show("Cập nhật lương thành công!");
                 LoadLuong();
             }

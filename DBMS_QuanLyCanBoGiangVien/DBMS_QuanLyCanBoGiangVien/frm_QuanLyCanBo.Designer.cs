@@ -30,7 +30,6 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frm_QuanLyCanBo));
             this.panel1 = new System.Windows.Forms.Panel();
-            this.btn_HoSoCaNhan = new System.Windows.Forms.Button();
             this.btn_QLLuong = new System.Windows.Forms.Button();
             this.btn_PhanCongGiangDay = new System.Windows.Forms.Button();
             this.btn_QLLopHocPhan = new System.Windows.Forms.Button();
@@ -52,7 +51,6 @@
             // panel1
             // 
             this.panel1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.panel1.Controls.Add(this.btn_HoSoCaNhan);
             this.panel1.Controls.Add(this.btn_QLLuong);
             this.panel1.Controls.Add(this.btn_PhanCongGiangDay);
             this.panel1.Controls.Add(this.btn_QLLopHocPhan);
@@ -65,27 +63,13 @@
             this.panel1.Size = new System.Drawing.Size(236, 542);
             this.panel1.TabIndex = 0;
             // 
-            // btn_HoSoCaNhan
-            // 
-            this.btn_HoSoCaNhan.FlatAppearance.BorderSize = 0;
-            this.btn_HoSoCaNhan.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btn_HoSoCaNhan.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btn_HoSoCaNhan.ForeColor = System.Drawing.Color.White;
-            this.btn_HoSoCaNhan.Location = new System.Drawing.Point(-1, 479);
-            this.btn_HoSoCaNhan.Name = "btn_HoSoCaNhan";
-            this.btn_HoSoCaNhan.Size = new System.Drawing.Size(236, 55);
-            this.btn_HoSoCaNhan.TabIndex = 10;
-            this.btn_HoSoCaNhan.Text = "Hồ sơ cá nhân";
-            this.btn_HoSoCaNhan.UseVisualStyleBackColor = true;
-            this.btn_HoSoCaNhan.Click += new System.EventHandler(this.btn_HoSoCaNhan_Click);
-            // 
             // btn_QLLuong
             // 
             this.btn_QLLuong.FlatAppearance.BorderSize = 0;
             this.btn_QLLuong.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_QLLuong.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_QLLuong.ForeColor = System.Drawing.Color.White;
-            this.btn_QLLuong.Location = new System.Drawing.Point(-1, 399);
+            this.btn_QLLuong.Location = new System.Drawing.Point(-1, 460);
             this.btn_QLLuong.Name = "btn_QLLuong";
             this.btn_QLLuong.Size = new System.Drawing.Size(236, 55);
             this.btn_QLLuong.TabIndex = 6;
@@ -99,7 +83,7 @@
             this.btn_PhanCongGiangDay.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_PhanCongGiangDay.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_PhanCongGiangDay.ForeColor = System.Drawing.Color.White;
-            this.btn_PhanCongGiangDay.Location = new System.Drawing.Point(-1, 323);
+            this.btn_PhanCongGiangDay.Location = new System.Drawing.Point(-1, 382);
             this.btn_PhanCongGiangDay.Name = "btn_PhanCongGiangDay";
             this.btn_PhanCongGiangDay.Size = new System.Drawing.Size(236, 55);
             this.btn_PhanCongGiangDay.TabIndex = 4;
@@ -113,7 +97,7 @@
             this.btn_QLLopHocPhan.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_QLLopHocPhan.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_QLLopHocPhan.ForeColor = System.Drawing.Color.White;
-            this.btn_QLLopHocPhan.Location = new System.Drawing.Point(-1, 239);
+            this.btn_QLLopHocPhan.Location = new System.Drawing.Point(-1, 294);
             this.btn_QLLopHocPhan.Name = "btn_QLLopHocPhan";
             this.btn_QLLopHocPhan.Size = new System.Drawing.Size(236, 55);
             this.btn_QLLopHocPhan.TabIndex = 3;
@@ -127,7 +111,7 @@
             this.btn_QLMonHoc.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_QLMonHoc.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_QLMonHoc.ForeColor = System.Drawing.Color.White;
-            this.btn_QLMonHoc.Location = new System.Drawing.Point(-1, 153);
+            this.btn_QLMonHoc.Location = new System.Drawing.Point(-1, 191);
             this.btn_QLMonHoc.Name = "btn_QLMonHoc";
             this.btn_QLMonHoc.Size = new System.Drawing.Size(236, 55);
             this.btn_QLMonHoc.TabIndex = 2;
@@ -141,7 +125,7 @@
             this.btn_QLNganh.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_QLNganh.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_QLNganh.ForeColor = System.Drawing.Color.White;
-            this.btn_QLNganh.Location = new System.Drawing.Point(-1, 78);
+            this.btn_QLNganh.Location = new System.Drawing.Point(-1, 112);
             this.btn_QLNganh.Name = "btn_QLNganh";
             this.btn_QLNganh.Size = new System.Drawing.Size(236, 55);
             this.btn_QLNganh.TabIndex = 1;
@@ -155,7 +139,7 @@
             this.btn_QLGiangVien.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_QLGiangVien.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_QLGiangVien.ForeColor = System.Drawing.Color.White;
-            this.btn_QLGiangVien.Location = new System.Drawing.Point(-1, 17);
+            this.btn_QLGiangVien.Location = new System.Drawing.Point(-1, 27);
             this.btn_QLGiangVien.Name = "btn_QLGiangVien";
             this.btn_QLGiangVien.Size = new System.Drawing.Size(236, 55);
             this.btn_QLGiangVien.TabIndex = 0;
@@ -278,7 +262,6 @@
         private System.Windows.Forms.Button btn_ThoatApp;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.Button btn_HoSoCaNhan;
         private System.Windows.Forms.Label lbl_Role;
         private System.Windows.Forms.Label label3;
     }

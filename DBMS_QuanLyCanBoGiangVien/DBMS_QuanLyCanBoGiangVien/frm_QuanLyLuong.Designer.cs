@@ -28,6 +28,8 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             this.splitContainerControl1 = new DevExpress.XtraEditors.SplitContainerControl();
             this.label1 = new System.Windows.Forms.Label();
@@ -49,6 +51,16 @@
             this.label4 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.dgv_BangLuong = new System.Windows.Forms.DataGridView();
+            this.MaCB = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.HoTen = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Thang = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Nam = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Thuong = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.KhauTru = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.PhuCap = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.HeSoLuong = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.MucLuongCoSo = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.TongLuong = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerControl1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerControl1.Panel1)).BeginInit();
             this.splitContainerControl1.Panel1.SuspendLayout();
@@ -78,7 +90,7 @@
             this.splitContainerControl1.Panel2.Controls.Add(this.gb_ThongTin);
             this.splitContainerControl1.Panel2.Controls.Add(this.dgv_BangLuong);
             this.splitContainerControl1.Panel2.Text = "Panel2";
-            this.splitContainerControl1.Size = new System.Drawing.Size(1521, 802);
+            this.splitContainerControl1.Size = new System.Drawing.Size(1130, 802);
             this.splitContainerControl1.SplitterPosition = 70;
             this.splitContainerControl1.TabIndex = 0;
             // 
@@ -86,7 +98,7 @@
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(679, 24);
+            this.label1.Location = new System.Drawing.Point(455, 35);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(226, 33);
             this.label1.TabIndex = 0;
@@ -96,7 +108,7 @@
             // 
             this.label2.AutoSize = true;
             this.label2.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label2.Location = new System.Drawing.Point(668, 264);
+            this.label2.Location = new System.Drawing.Point(473, 276);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(183, 33);
             this.label2.TabIndex = 2;
@@ -123,7 +135,7 @@
             this.gb_ThongTin.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.gb_ThongTin.Location = new System.Drawing.Point(0, 0);
             this.gb_ThongTin.Name = "gb_ThongTin";
-            this.gb_ThongTin.Size = new System.Drawing.Size(1521, 261);
+            this.gb_ThongTin.Size = new System.Drawing.Size(1130, 261);
             this.gb_ThongTin.TabIndex = 1;
             this.gb_ThongTin.TabStop = false;
             this.gb_ThongTin.Text = "Thông tin Cán bộ";
@@ -149,7 +161,7 @@
             // btn_LamMoi
             // 
             this.btn_LamMoi.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btn_LamMoi.Location = new System.Drawing.Point(1307, 216);
+            this.btn_LamMoi.Location = new System.Drawing.Point(928, 204);
             this.btn_LamMoi.Name = "btn_LamMoi";
             this.btn_LamMoi.Size = new System.Drawing.Size(151, 35);
             this.btn_LamMoi.TabIndex = 12;
@@ -160,7 +172,7 @@
             // btn_Thoát
             // 
             this.btn_Thoát.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btn_Thoát.Location = new System.Drawing.Point(998, 216);
+            this.btn_Thoát.Location = new System.Drawing.Point(685, 204);
             this.btn_Thoát.Name = "btn_Thoát";
             this.btn_Thoát.Size = new System.Drawing.Size(151, 35);
             this.btn_Thoát.TabIndex = 11;
@@ -211,7 +223,7 @@
             // btn_Xoa
             // 
             this.btn_Xoa.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btn_Xoa.Location = new System.Drawing.Point(685, 216);
+            this.btn_Xoa.Location = new System.Drawing.Point(471, 204);
             this.btn_Xoa.Name = "btn_Xoa";
             this.btn_Xoa.Size = new System.Drawing.Size(151, 35);
             this.btn_Xoa.TabIndex = 6;
@@ -222,7 +234,7 @@
             // btn_Sua
             // 
             this.btn_Sua.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btn_Sua.Location = new System.Drawing.Point(337, 216);
+            this.btn_Sua.Location = new System.Drawing.Point(250, 204);
             this.btn_Sua.Name = "btn_Sua";
             this.btn_Sua.Size = new System.Drawing.Size(151, 35);
             this.btn_Sua.TabIndex = 5;
@@ -233,7 +245,7 @@
             // btn_TinhLuong
             // 
             this.btn_TinhLuong.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btn_TinhLuong.Location = new System.Drawing.Point(46, 216);
+            this.btn_TinhLuong.Location = new System.Drawing.Point(35, 204);
             this.btn_TinhLuong.Name = "btn_TinhLuong";
             this.btn_TinhLuong.Size = new System.Drawing.Size(151, 35);
             this.btn_TinhLuong.TabIndex = 4;
@@ -283,23 +295,130 @@
             // 
             // dgv_BangLuong
             // 
-            dataGridViewCellStyle3.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.dgv_BangLuong.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.dgv_BangLuong.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle2.BackColor = System.Drawing.SystemColors.Control;
+            dataGridViewCellStyle2.Font = new System.Drawing.Font("Tahoma", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle2.ForeColor = System.Drawing.SystemColors.WindowText;
+            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+            this.dgv_BangLuong.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
             this.dgv_BangLuong.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dgv_BangLuong.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.MaCB,
+            this.HoTen,
+            this.Thang,
+            this.Nam,
+            this.Thuong,
+            this.KhauTru,
+            this.PhuCap,
+            this.HeSoLuong,
+            this.MucLuongCoSo,
+            this.TongLuong});
+            dataGridViewCellStyle3.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle3.Font = new System.Drawing.Font("Tahoma", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle3.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle3.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle3.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle3.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.dgv_BangLuong.DefaultCellStyle = dataGridViewCellStyle3;
             this.dgv_BangLuong.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.dgv_BangLuong.Location = new System.Drawing.Point(0, 312);
             this.dgv_BangLuong.Name = "dgv_BangLuong";
             this.dgv_BangLuong.RowHeadersWidth = 62;
             this.dgv_BangLuong.RowTemplate.Height = 28;
-            this.dgv_BangLuong.Size = new System.Drawing.Size(1521, 405);
+            this.dgv_BangLuong.Size = new System.Drawing.Size(1130, 405);
             this.dgv_BangLuong.TabIndex = 0;
             this.dgv_BangLuong.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgv_BangLuong_CellClick);
+            // 
+            // MaCB
+            // 
+            this.MaCB.DataPropertyName = "MaCB";
+            this.MaCB.HeaderText = "Mã Cán Bộ";
+            this.MaCB.MinimumWidth = 8;
+            this.MaCB.Name = "MaCB";
+            this.MaCB.Width = 150;
+            // 
+            // HoTen
+            // 
+            this.HoTen.DataPropertyName = "HoTen";
+            this.HoTen.HeaderText = "Tên Cán Bộ";
+            this.HoTen.MinimumWidth = 8;
+            this.HoTen.Name = "HoTen";
+            this.HoTen.Width = 150;
+            // 
+            // Thang
+            // 
+            this.Thang.DataPropertyName = "Thang";
+            this.Thang.HeaderText = "Tháng";
+            this.Thang.MinimumWidth = 8;
+            this.Thang.Name = "Thang";
+            this.Thang.Width = 150;
+            // 
+            // Nam
+            // 
+            this.Nam.DataPropertyName = "Nam";
+            this.Nam.HeaderText = "Năm";
+            this.Nam.MinimumWidth = 8;
+            this.Nam.Name = "Nam";
+            this.Nam.Width = 150;
+            // 
+            // Thuong
+            // 
+            this.Thuong.DataPropertyName = "Thuong";
+            this.Thuong.HeaderText = "Thưởng";
+            this.Thuong.MinimumWidth = 8;
+            this.Thuong.Name = "Thuong";
+            this.Thuong.Width = 150;
+            // 
+            // KhauTru
+            // 
+            this.KhauTru.DataPropertyName = "KhauTru";
+            this.KhauTru.HeaderText = "Khấu Trừ";
+            this.KhauTru.MinimumWidth = 8;
+            this.KhauTru.Name = "KhauTru";
+            this.KhauTru.Width = 150;
+            // 
+            // PhuCap
+            // 
+            this.PhuCap.DataPropertyName = "PhuCap";
+            this.PhuCap.HeaderText = "Phụ Cấp";
+            this.PhuCap.MinimumWidth = 8;
+            this.PhuCap.Name = "PhuCap";
+            this.PhuCap.Width = 150;
+            // 
+            // HeSoLuong
+            // 
+            this.HeSoLuong.DataPropertyName = "HeSoLuong";
+            this.HeSoLuong.HeaderText = "Hệ Số Lương";
+            this.HeSoLuong.MinimumWidth = 8;
+            this.HeSoLuong.Name = "HeSoLuong";
+            this.HeSoLuong.Width = 150;
+            // 
+            // MucLuongCoSo
+            // 
+            this.MucLuongCoSo.DataPropertyName = "MucLuongCoSo";
+            this.MucLuongCoSo.HeaderText = "Mức Lương Cơ Sở";
+            this.MucLuongCoSo.MinimumWidth = 8;
+            this.MucLuongCoSo.Name = "MucLuongCoSo";
+            this.MucLuongCoSo.Width = 150;
+            // 
+            // TongLuong
+            // 
+            this.TongLuong.DataPropertyName = "TongLuong";
+            this.TongLuong.HeaderText = "Tổng Lương";
+            this.TongLuong.MinimumWidth = 8;
+            this.TongLuong.Name = "TongLuong";
+            this.TongLuong.Width = 150;
             // 
             // frm_QuanLyLuong
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(16F, 32F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1521, 802);
+            this.ClientSize = new System.Drawing.Size(1130, 802);
             this.Controls.Add(this.splitContainerControl1);
             this.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.Margin = new System.Windows.Forms.Padding(5);
@@ -344,5 +463,15 @@
         private System.Windows.Forms.Button btn_LamMoi;
         private System.Windows.Forms.TextBox txt_KhauTru;
         private System.Windows.Forms.TextBox txt_Thuong;
+        private System.Windows.Forms.DataGridViewTextBoxColumn MaCB;
+        private System.Windows.Forms.DataGridViewTextBoxColumn HoTen;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Thang;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Nam;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Thuong;
+        private System.Windows.Forms.DataGridViewTextBoxColumn KhauTru;
+        private System.Windows.Forms.DataGridViewTextBoxColumn PhuCap;
+        private System.Windows.Forms.DataGridViewTextBoxColumn HeSoLuong;
+        private System.Windows.Forms.DataGridViewTextBoxColumn MucLuongCoSo;
+        private System.Windows.Forms.DataGridViewTextBoxColumn TongLuong;
     }
 }

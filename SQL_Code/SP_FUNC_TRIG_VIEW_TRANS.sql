@@ -147,17 +147,6 @@ BEGIN
 END
 GO
 
--- Test login với giảng viên
-EXECUTE AS USER = 'vdbao';
-SELECT USER_NAME() AS CurrentUser;
-SELECT r.name AS RoleName
-FROM sys.database_role_members drm
-JOIN sys.database_principals r ON r.principal_id = drm.role_principal_id
-JOIN sys.database_principals m ON m.principal_id = drm.member_principal_id
-WHERE m.name = USER_NAME();
-REVERT;
-
-
 -- GRANT QUYỀN
 
 -- Cho tất cả role được phép gọi hàm RTO_CurrentPrincipal
@@ -216,11 +205,12 @@ GRANT EXECUTE ON dbo.HasP_GetSoTietByMon		TO r_TruongKhoa;
 
 
 -- Lương: chỉ xem
-GRANT SELECT  ON dbo.Vw_CanBo_Luong          TO r_TruongKhoa;
-GRANT SELECT ON dbo.Vw_Khoa_CuaToi TO r_TruongKhoa;
-GRANT SELECT ON dbo.Vw_Nganh_TrongKhoaCuaToi TO r_TruongKhoa;
+GRANT SELECT  ON dbo.Vw_CanBo_Luong				TO r_TruongKhoa;
+GRANT SELECT ON dbo.Vw_Khoa_CuaToi				TO r_TruongKhoa;
+GRANT SELECT ON dbo.Vw_Nganh_TrongKhoaCuaToi	TO r_TruongKhoa;
+GRANT SELECT ON dbo.Vw_Luong_CuaToi				TO r_TruongKhoa;
 
--- Hồ sơ cá nhân: cho phép update hồ sơ của chính mình
+-- Hồ sơ cá nhân
 GRANT EXECUTE ON dbo.Re_UpdateHoSoCaNhan     TO r_TruongKhoa;
 
 
@@ -244,9 +234,8 @@ GRANT EXECUTE ON dbo.HasP_GetNganhByKhoa			TO r_GiangVien;
 GRANT EXECUTE ON dbo.HasP_GetMonHocByNganh_PC		TO r_GiangVien;
 GRANT EXECUTE ON dbo.HasP_GetSoTietByMon			TO r_GiangVien;
 GRANT EXECUTE ON dbo.HasP_GetLopChuaPhanCong		TO r_GiangVien;
-
-
--- Hồ sơ cá nhân: update thông tin của chính mình
+GRANT SELECT ON dbo.Vw_Luong_CuaToi					TO r_GiangVien;
+-- Hồ sơ cá nhân
 GRANT EXECUTE ON dbo.Re_UpdateHoSoCaNhan			TO r_GiangVien;
 
 
@@ -959,42 +948,46 @@ CREATE OR ALTER PROCEDURE dbo.HasP_InsertPhanCong
     @SoTuan INT,
     @HocKy INT,
     @NamHoc NVARCHAR(20),
-	@MaNganh NVARCHAR(20)
+    @MaNganh NVARCHAR(20)
 AS
 BEGIN
-    DECLARE @role NVARCHAR(50),@mk NVARCHAR(20),@target NVARCHAR(20);
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20), @TenMon NVARCHAR(200);
+
     SELECT TOP(1) @role=RoleName,@mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
     SELECT @target=cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB=@MaCB;
+    SELECT @TenMon=TenMon FROM dbo.MonHoc WHERE MaMon=@MaMon;
 
     IF @role<>N'Admin' AND @target<>@mk
         RAISERROR(N'Không phân công giảng viên ngoài khoa.',16,1);
     ELSE
         INSERT INTO dbo.PhanCongGiangDay
-        (MaLopHocPhan,MaCB,MaNganh,MaMon,SoTiet,SoTuan,HocKy,NamHoc)
-        VALUES(@MaLopHocPhan,@MaCB,@MaNganh,@MaMon,@SoTiet,@SoTuan,@HocKy,@NamHoc);
+        (MaLopHocPhan, MaCB, MaNganh, MaMon, TenMon, SoTiet, SoTuan, HocKy, NamHoc)
+        VALUES(@MaLopHocPhan,@MaCB,@MaNganh,@MaMon,@TenMon,@SoTiet,@SoTuan,@HocKy,@NamHoc);
 END
 GO
 
 
+
 CREATE OR ALTER PROCEDURE dbo.HasP_UpdatePhanCong
+	@OldMaCB NVARCHAR(20),
+    @OldMaMon NVARCHAR(20),
     @OldMaLopHocPhan NVARCHAR(20),
-    @OldMaCB NVARCHAR(20),
     @OldHocKy INT,
-    @OldNamHoc NVARCHAR(20),
-    @NewMaLopHocPhan NVARCHAR(20),
-    @NewMaCB NVARCHAR(20),
-    @NewMaNganh NVARCHAR(20),
+    @OldNamHoc NVARCHAR(9),
+
     @NewMaMon NVARCHAR(20),
+    @NewMaLopHocPhan NVARCHAR(20),
     @NewSoTiet INT,
     @NewSoTuan INT,
     @NewHocKy INT,
-    @NewNamHoc NVARCHAR(20)
+    @NewNamHoc NVARCHAR(9),
+    @NewMaNganh NVARCHAR(20)   -- thêm ngành
 AS
 BEGIN
-    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
+    DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20), @TenMon NVARCHAR(200);
     SELECT TOP(1) @role=RoleName, @mk=MaKhoa FROM dbo.RTO_CurrentPrincipal();
-
-    SELECT @target=cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB=@NewMaCB;
+    SELECT @target=cb.MaKhoa FROM dbo.CanBo cb WHERE cb.MaCB=@OldMaCB;
+    SELECT @TenMon=TenMon FROM dbo.MonHoc WHERE MaMon=@NewMaMon;
 
     IF @target IS NULL
         RAISERROR(N'Giảng viên mới không tồn tại.',16,1);
@@ -1003,24 +996,31 @@ BEGIN
     ELSE
         UPDATE dbo.PhanCongGiangDay
         SET MaLopHocPhan=@NewMaLopHocPhan,
-            MaCB=@NewMaCB,
             MaNganh=@NewMaNganh,
             MaMon=@NewMaMon,
+            TenMon=@TenMon,
+			-- TenMon=(SELECT TenMon FROM MonHoc WHERE MaMon=@NewMaMon),
             SoTiet=@NewSoTiet,
             SoTuan=@NewSoTuan,
             HocKy=@NewHocKy,
             NamHoc=@NewNamHoc
-        WHERE MaLopHocPhan=@OldMaLopHocPhan AND MaCB=@OldMaCB
-              AND HocKy=@OldHocKy AND NamHoc=@OldNamHoc;
+        WHERE MaLopHocPhan=@OldMaLopHocPhan 
+          AND MaCB=@OldMaCB 
+          AND HocKy=@OldHocKy 
+          AND NamHoc=@OldNamHoc
+		  --AND MaMon=@OldMaMon
+		  ;
 END
 GO
+
 
 
 CREATE OR ALTER PROCEDURE dbo.HasP_DeletePhanCong
     @MaLopHocPhan NVARCHAR(20),
     @MaCB NVARCHAR(20),
     @HocKy INT,
-    @NamHoc NVARCHAR(20)
+    @NamHoc NVARCHAR(20),
+	@MaMon NVARCHAR(20)
 AS
 BEGIN
     DECLARE @role NVARCHAR(50), @mk NVARCHAR(20), @target NVARCHAR(20);
@@ -1046,21 +1046,13 @@ CREATE OR ALTER PROCEDURE HasP_GetPhanCongByKhoa
     @MaKhoa NVARCHAR(20)
 AS
 BEGIN
-    SET NOCOUNT ON;
 
-    SELECT 
-        pc.MaCB,
-        pc.MaMon,          -- thêm cột này để form dùng
-        pc.TenMon,
-        pc.MaLopHocPhan,
-        pc.SoTiet,
-        pc.SoTuan,
-        pc.HocKy,
-        pc.NamHoc
-    FROM PhanCongGiangDay pc
-    JOIN CanBo cb ON pc.MaCB = cb.MaCB
-    WHERE cb.MaKhoa = @MaKhoa
-    ORDER BY pc.NamHoc DESC, pc.HocKy, pc.TenMon;
+    SELECT pc.MaCB, pc.MaMon, pc.TenMon, pc.MaLopHocPhan,
+		   pc.SoTiet, pc.SoTuan, pc.HocKy, pc.NamHoc, pc.MaNganh
+	FROM PhanCongGiangDay pc
+	JOIN CanBo cb ON pc.MaCB = cb.MaCB
+	WHERE cb.MaKhoa = @MaKhoa
+	ORDER BY pc.NamHoc DESC, pc.HocKy, pc.TenMon;
 END;
 go
 
@@ -1262,28 +1254,10 @@ GO
 
 
 
-  -- 5. Trigger Tính lương
-CREATE TRIGGER TRG_TinhTongLuong
-ON BangLuong
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    UPDATE BL
-    SET 
-		TongLuong = (BL.LuongCoBan * ISNULL(H.GiaTri, 1)) + ISNULL(BL.TongPhuCap, 0) - ISNULL(BL.KhauTru, 0)
-    FROM BangLuong BL
-    INNER JOIN inserted I
-        ON BL.BangLuongId = I.BangLuongId
-    LEFT JOIN HeSoLuong H
-        ON BL.HeSoId = H.HeSoId;
-END;
-GO
-
 CREATE OR ALTER PROCEDURE Re_TinhLuongCanBo
     @MaCB NVARCHAR(20),
     @Thang INT,
     @Nam INT,
-    @DonGiaTiet DECIMAL(18,2) = NULL,  -- nếu muốn tính theo tiết
     @Thuong DECIMAL(18,2) = 0,
     @KhauTru DECIMAL(18,2) = 0
 AS
@@ -1292,7 +1266,15 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        -- Kiểm tra đã có bảng lương tháng/năm này chưa
+        -- Kiểm tra cán bộ tồn tại
+        IF NOT EXISTS (SELECT 1 FROM CanBo WHERE MaCB=@MaCB)
+        BEGIN
+            RAISERROR(N'Cán bộ không tồn tại',16,1);
+            ROLLBACK TRAN;
+            RETURN;
+        END;
+
+        -- Kiểm tra đã có lương tháng/năm chưa
         IF EXISTS (SELECT 1 FROM BangLuong WHERE MaCB=@MaCB AND Thang=@Thang AND Nam=@Nam)
         BEGIN
             RAISERROR(N'Đã có bảng lương cho cán bộ này trong tháng/năm', 16, 1);
@@ -1300,31 +1282,7 @@ BEGIN
             RETURN;
         END;
 
-        DECLARE @LuongCoSo DECIMAL(18,2) = (SELECT TOP 1 MucLuongCoSo FROM CauHinhLuong);
-        DECLARE @HeSo DECIMAL(4,2) = (
-            SELECT HeSoLuong FROM BacLuong b
-            JOIN CanBo c ON b.MaBacLuong = c.MaBacLuong
-            WHERE c.MaCB=@MaCB
-        );
-        DECLARE @PhuCap DECIMAL(18,2) = (SELECT ISNULL(PhuCap,0) FROM CanBo WHERE MaCB=@MaCB);
-
-        IF @LuongCoSo IS NULL SET @LuongCoSo = 0;
-        IF @HeSo IS NULL SET @HeSo = 1;
-
-        -- Nếu có tính thêm theo tiết dạy
-        DECLARE @LuongTiet DECIMAL(18,2) = 0;
-        IF @DonGiaTiet IS NOT NULL
-        BEGIN
-            SELECT @LuongTiet = SUM(SoTiet * SoTuan * @DonGiaTiet)
-            FROM PhanCongGiangDay
-            WHERE MaCB=@MaCB AND YEAR(GETDATE())=@Nam AND MONTH(GETDATE())=@Thang;
-            IF @LuongTiet IS NULL SET @LuongTiet = 0;
-        END
-
-        -- Tổng lương cơ bản theo bậc + phụ cấp + thưởng - khấu trừ
-        DECLARE @TongLuong DECIMAL(18,2) =
-            (@LuongCoSo * @HeSo) + @PhuCap + @Thuong + @LuongTiet - @KhauTru;
-
+        -- Chèn bản ghi lương
         INSERT INTO BangLuong(MaCB, Thang, Nam, Thuong, KhauTru)
         VALUES(@MaCB, @Thang, @Nam, @Thuong, @KhauTru);
 
@@ -1335,50 +1293,58 @@ BEGIN
         THROW;
     END CATCH
 END;
-EXEC Re_TinhLuongCanBo '2003', 9, 2025, NULL, 500000, 200000;
+GO
+
+
+EXEC Re_TinhLuongCanBo '2003', 9, 2025, 500000, 200000;
 SELECT * FROM Vw_CanBo_Luong;
-EXEC HasP_UpdateBangLuong 2, 1000000, 300000;
-EXEC HasP_DeleteBangLuong 2;
 
-
-
-
-INSERT INTO CauHinhLuong VALUES (1800000);
-
--- Thêm bậc lương
-INSERT INTO BacLuong VALUES ('BL01', 2.34), ('BL02', 3.50);
-
--- Gán cho cán bộ
-UPDATE CanBo SET MaBacLuong='BL01', PhuCap=500000 WHERE MaCB='2003';
-
--- Tính lương
-EXEC Re_TinhLuongCanBo '2003', 9, 2025, NULL, 1000000, 200000;
-
--- Xem kết quả
-SELECT * FROM Vw_CanBo_Luong WHERE MaCB='2003';
 
 
 CREATE OR ALTER PROCEDURE HasP_UpdateBangLuong
-    @MaBangLuong INT,
+    @MaCB NVARCHAR(20),
+    @Thang INT,
+    @Nam INT,
     @Thuong DECIMAL(18,2),
     @KhauTru DECIMAL(18,2)
 AS
 BEGIN
     UPDATE BangLuong
     SET Thuong=@Thuong, KhauTru=@KhauTru
-    WHERE MaBangLuong=@MaBangLuong;
-END;
+    WHERE MaCB=@MaCB AND Thang=@Thang AND Nam=@Nam;
+END
+GO
+EXEC HasP_UpdateBangLuong
+    @MaCB = N'1982',
+    @Thang = 12,
+    @Nam = 2026,
+    @Thuong = 1500000,
+    @KhauTru = 100000;
 GO
 
--- Xóa bảng lương
+-- Kiểm tra lại
+SELECT * FROM BangLuong WHERE MaCB = '1982' AND Thang = 12 AND Nam = 2026;
+
+-- Delete
 CREATE OR ALTER PROCEDURE HasP_DeleteBangLuong
-    @MaBangLuong INT
+    @MaCB NVARCHAR(20),
+    @Thang INT,
+    @Nam INT
 AS
 BEGIN
-    DELETE FROM BangLuong WHERE MaBangLuong=@MaBangLuong;
-END;
+    DELETE FROM BangLuong
+    WHERE MaCB=@MaCB AND Thang=@Thang AND Nam=@Nam;
+END
 GO
 
+EXEC HasP_DeleteBangLuong
+    @MaCB = N'1982',
+    @Thang = 12,
+    @Nam = 2026;
+GO
+
+-- Kiểm tra lại
+SELECT * FROM BangLuong WHERE MaCB = '2003' AND Thang = 9 AND Nam = 2025;
 
 
 
@@ -1395,15 +1361,27 @@ JOIN SinhVien_Lop svl ON sv.MaSV = svl.MaSV;
 GO
 
 -- 2. View: Lương giảng viên chi tiết
-CREATE OR ALTER VIEW Vw_CanBo_Luong AS
-SELECT cb.MaCB, cb.HoTen, bl.Thang, bl.Nam,
-       bl.Thuong, bl.KhauTru, cb.PhuCap,
-       b.HeSoLuong, cfg.MucLuongCoSo,
-       (cfg.MucLuongCoSo * b.HeSoLuong + cb.PhuCap + bl.Thuong - bl.KhauTru) AS TongLuong
+CREATE OR ALTER VIEW Vw_CanBo_Luong
+AS
+SELECT 
+    bl.MaCB,
+    cb.HoTen,
+    bl.Thang,
+    bl.Nam,
+    cb.PhuCap,
+    bl.Thuong,
+    bl.KhauTru,
+    b.HeSoLuong,
+    ch.MucLuongCoSo,
+    (ch.MucLuongCoSo * b.HeSoLuong + cb.PhuCap + bl.Thuong - bl.KhauTru) AS TongLuong
 FROM BangLuong bl
 JOIN CanBo cb ON bl.MaCB = cb.MaCB
-LEFT JOIN BacLuong b ON cb.MaBacLuong = b.MaBacLuong
-CROSS JOIN CauHinhLuong cfg;
+JOIN BacLuong b ON cb.MaBacLuong = b.MaBacLuong
+CROSS APPLY (SELECT TOP 1 MucLuongCoSo FROM CauHinhLuong) ch;
+SELECT * FROM Vw_CanBo_Luong;
+
+
+
 
 -- 3. Ngành Khoa (Dùng)
 CREATE OR ALTER VIEW Vw_Nganh
@@ -1482,12 +1460,24 @@ GO
 -- 9.
 CREATE OR ALTER VIEW dbo.Vw_PhanCong_CuaToi
 AS
-SELECT pc.MaLopHocPhan, pc.MaCB, lhp.TenLopHocPhan
+SELECT 
+    pc.MaCB,
+    pc.MaMon,
+    mh.TenMon,
+    pc.MaLopHocPhan,
+    lhp.TenLopHocPhan,
+    pc.SoTiet,
+    pc.SoTuan,
+    pc.HocKy,
+    pc.NamHoc,
+    pc.MaNganh
 FROM dbo.PhanCongGiangDay pc
-JOIN dbo.LopHocPhan lhp ON pc.MaLopHocPhan=lhp.MaLopHocPhan
+JOIN dbo.MonHoc mh ON pc.MaMon = mh.MaMon
+JOIN dbo.LopHocPhan lhp ON pc.MaLopHocPhan = lhp.MaLopHocPhan
 CROSS JOIN dbo.RTO_CurrentPrincipal() cp
-WHERE pc.MaCB=cp.MaCB;
+WHERE pc.MaCB = cp.MaCB;
 GO
+
 
 
 -- 10.
@@ -1514,17 +1504,11 @@ WHERE cp.RoleName IN (N'TruongKhoa', N'GiangVien')
 GO
 
 -- 12. 
-CREATE OR ALTER VIEW Vw_PhanCong_ByKhoa
+CREATE OR ALTER VIEW Vw_Luong_CuaToi
 AS
-SELECT pc.MaLopHocPhan, pc.MaCB, gv.HoTen,
-       lhp.MaMon, mh.TenMon, mh.MaNganh,   -- thêm MaNganh
-       pc.HocKy, pc.NamHoc, pc.SoTiet, pc.SoTuan
-FROM PhanCongGiangDay pc
-JOIN LopHocPhan lhp ON pc.MaLopHocPhan = lhp.MaLopHocPhan
-JOIN MonHoc mh ON lhp.MaMon = mh.MaMon
-JOIN CanBo gv ON pc.MaCB = gv.MaCB;
+SELECT v.*
+FROM Vw_CanBo_Luong v
+CROSS JOIN RTO_CurrentPrincipal() cp
+WHERE v.MaCB = cp.MaCB;
 
-
-/*=========================
-	   6. TRANSACTION
-  =========================*/
+SELECT * FROM Vw_Luong_CuaToi;

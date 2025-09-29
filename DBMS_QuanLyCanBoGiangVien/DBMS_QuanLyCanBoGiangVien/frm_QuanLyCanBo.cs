@@ -76,11 +76,5 @@ namespace DBMS_QuanLyCanBoGiangVien
             frm_QuanLyLuong frm = new frm_QuanLyLuong(connStr, role, maCB);
             frm.ShowDialog();
         }
-
-        private void btn_HoSoCaNhan_Click(object sender, EventArgs e)
-        {
-            frm_HoSoCanBo frm = new frm_HoSoCanBo();
-            frm.ShowDialog();
-        }
     }
 }
